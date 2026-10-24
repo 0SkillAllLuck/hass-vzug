@@ -1,9 +1,62 @@
+from collections.abc import Callable, Hashable, Iterable, Iterator
+
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import UndefinedType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from . import api, zones
 from .shared import ConfigCoordinator, Shared, ZoneCoordinator
+
+
+def add_entities_as_they_appear[T, K: Hashable, V](
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator[T],
+    async_add_entities: AddEntitiesCallback,
+    candidates: Callable[[T], Iterable[tuple[K, V]]],
+    factory: Callable[[K, V], Entity | None],
+) -> None:
+    """Add an entity for every candidate, now and whenever an update brings new ones.
+
+    A busy appliance answers with an empty config tree or all-zero eco info, so what
+    exists at setup isn't everything there is. 'factory' returns None to skip a
+    candidate, it is asked again on the next update.
+
+    Entities whose candidate disappears are kept: a busy appliance's answer can't be
+    told apart from a real removal.
+    """
+    added: set[K] = set()
+
+    @callback
+    def _add_new() -> None:
+        if coordinator.data is None:
+            return
+        entities: list[Entity] = []
+        for key, value in candidates(coordinator.data):
+            if key in added or (entity := factory(key, value)) is None:
+                continue
+            added.add(key)
+            entities.append(entity)
+        if entities:
+            async_add_entities(entities)
+
+    _add_new()
+    config_entry.async_on_unload(coordinator.async_add_listener(_add_new))
+
+
+def user_config_commands(
+    config: api.AggConfig,
+) -> Iterator[tuple[tuple[str, str], api.Command]]:
+    """((category key, command key), command) for every command in the config tree."""
+    for category in config.values():
+        for command in category.commands.values():
+            yield (category.key, command.get("command", "")), command
 
 
 class UserConfigEntity(CoordinatorEntity[ConfigCoordinator]):

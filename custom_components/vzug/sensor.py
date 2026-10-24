@@ -1,5 +1,5 @@
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
@@ -19,7 +19,13 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import api, zones
 from .const import DOMAIN
-from .helpers import UserConfigEntity, ZoneEntity, snake
+from .helpers import (
+    UserConfigEntity,
+    ZoneEntity,
+    add_entities_as_they_appear,
+    snake,
+    user_config_commands,
+)
 from .shared import Shared, StateCoordinator
 
 # https://developers.home-assistant.io/docs/core/entity/sensor/
@@ -101,25 +107,43 @@ async def async_setup_entry(
         LastNotification(shared),
     ]
 
-    for category in shared.config_coord.data.values():
-        for command in category.commands.values():
-            if command.get("type") == "status":
-                entities.append(
-                    UserConfigSensor(
-                        shared,
-                        category_key=category.key,
-                        command_key=command.get("command", ""),
-                    )
-                )
-
-    for desc in _ECO_SENSORS:
-        category, _, field = desc.key.partition(".")
-        if category not in shared.state_coord.data.eco_info:
-            continue
-        entities.append(Eco(shared, desc, category=category, field=field))
-
     entities.extend(_zone_entities(shared))
     async_add_entities(entities)
+
+    def user_config(
+        key: tuple[str, str], command: api.Command
+    ) -> UserConfigSensor | None:
+        if command.get("type") == "status":
+            return UserConfigSensor(shared, category_key=key[0], command_key=key[1])
+        return None
+
+    add_entities_as_they_appear(
+        config_entry,
+        shared.config_coord,
+        async_add_entities,
+        user_config_commands,
+        user_config,
+    )
+
+    def eco(key: str, desc: SensorEntityDescription) -> Eco:
+        category, _, field = key.partition(".")
+        return Eco(shared, desc, category=category, field=field)
+
+    add_entities_as_they_appear(
+        config_entry,
+        shared.state_coord,
+        async_add_entities,
+        _eco_sensors,
+        eco,
+    )
+
+
+def _eco_sensors(
+    state: api.AggState,
+) -> Iterator[tuple[str, SensorEntityDescription]]:
+    for desc in _ECO_SENSORS:
+        if desc.key.partition(".")[0] in state.eco_info:
+            yield desc.key, desc
 
 
 def _zone_entities(shared: Shared) -> list[SensorEntity]:
