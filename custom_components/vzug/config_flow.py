@@ -11,7 +11,6 @@ from homeassistant import config_entries
 from homeassistant.components.network import Adapter, async_get_adapters
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_BASE, CONF_HOST, CONF_PASSWORD, CONF_USERNAME
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import discovery_flow as df
 from homeassistant.helpers.selector import (
@@ -29,7 +28,6 @@ _LOGGER = logging.getLogger(__name__)
 
 _DISCOVERY_TIMEOUT = 3.0
 
-ABORT_UPDATE_SUCCESS = "update_success"
 ABORT_FALSE_DISCOVERY = "false_discovery"
 ABORT_DISCOVERY_FINISHED = "discovery_finished"
 
@@ -158,6 +156,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         discovery_info = cast(api.discovery.DiscoveryInfo, discovery_info)
         _LOGGER.debug("setting up manually discovered device: %s", discovery_info)
         self._base_url = URL(f"http://{discovery_info.host}")
+        # the broadcast has no MAC, but a configured appliance at the same host is known
+        self._async_abort_entries_match({CONF_BASE_URL: str(self._base_url)})
 
         if res := await self._check_device(needs_confirmation=True, errors={}):
             return res
@@ -173,6 +173,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except Exception:
             errors[CONF_BASE] = ERR_CANNOT_CONNECT
             return None
+        await self._async_set_unique_id_from_meta()
 
         if needs_confirmation:
             return await self.async_step_confirm()
@@ -194,6 +195,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except Exception:
                 errors[CONF_BASE] = ERR_CANNOT_CONNECT
             else:
+                await self._async_set_unique_id_from_meta()
                 return await self._create_entry()
 
         return self.async_show_form(
@@ -224,6 +226,24 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(step_id="confirm")
 
+    async def _async_set_unique_id_from_meta(self) -> None:
+        """Identify the appliance by its MAC, and abort if that doesn't fit the flow."""
+        assert self._meta
+        await self.async_set_unique_id(
+            dr.format_mac(self._meta.mac_address),
+            # only discoveries give way to another flow for the same appliance
+            raise_on_progress=self.source in config_entries.DISCOVERY_SOURCES,
+        )
+        if self.source == config_entries.SOURCE_REAUTH:
+            self._abort_if_unique_id_mismatch()
+        elif self.source == config_entries.SOURCE_USER:
+            self._abort_if_unique_id_configured()
+        else:
+            # a discovery: the appliance may have moved to a new address
+            self._abort_if_unique_id_configured(
+                updates={CONF_BASE_URL: str(self._base_url)}
+            )
+
     async def _create_entry(self) -> ConfigFlowResult:
         assert self._base_url
         assert self._meta
@@ -233,24 +253,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_PASSWORD: self._password,
             CONF_BASE_URL: str(self._base_url),
         }
-        existing_entry = await self.async_set_unique_id(
-            dr.format_mac(self._meta.mac_address)
-        )
-        if existing_entry:
-            _LOGGER.debug("updating existing entry")
-            self.hass.config_entries.async_update_entry(existing_entry, data=data)
-            self.hass.async_create_task(
-                self.hass.config_entries.async_reload(existing_entry.entry_id)
+        if self.source == config_entries.SOURCE_REAUTH:
+            return self.async_update_reload_and_abort(
+                self._get_reauth_entry(), data_updates=data
             )
-
-            return self.async_abort(reason=ABORT_UPDATE_SUCCESS)
 
         _LOGGER.debug("creating entry")
         return self.async_create_entry(title=self._meta.create_unique_name(), data=data)
-
-
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
 
 
 def _iter_adapter_interfaces(adapters: list[Adapter]) -> Iterator[IPv4Interface]:
