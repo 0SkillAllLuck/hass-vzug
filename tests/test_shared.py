@@ -1,12 +1,22 @@
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
-from custom_components.vzug.api import AggState, AggUpdateStatus, AuthenticationFailed
+from custom_components.vzug.api import (
+    AggState,
+    AggUpdateStatus,
+    AuthenticationFailed,
+    VZugApi,
+)
+from custom_components.vzug.button import CheckUpdate
+from custom_components.vzug.sensor import Program
 from custom_components.vzug.shared import (
+    CONFIG_COORD_INTERVAL,
     STATE_COORD_ACTIVE_INTERVAL,
     STATE_COORD_IDLE_INTERVAL,
     STATE_COORD_IDLE_PROBE_INTERVAL,
@@ -15,8 +25,11 @@ from custom_components.vzug.shared import (
     UPDATE_COORD_IDLE_INTERVAL,
     UPDATE_COORD_SETTLE_INTERVAL,
     UPDATE_COORD_SETTLE_PERIOD,
+    UNREACHABLE_RETRY_INTERVAL,
     Shared,
 )
+
+from .test_api import _json_response, _status_response
 
 _ECO_INFO = {"water": {"total": 80085.5}, "energy": {"total": 615.7}}
 
@@ -465,3 +478,144 @@ async def test_failed_requests_do_not_extend_the_window(shared):
     )
 
     assert await _poll_update(shared, None, sw=None) == UPDATE_COORD_IDLE_INTERVAL
+
+
+@pytest.mark.asyncio
+async def test_unreachable_appliance_makes_the_state_unavailable(shared):
+    """No answer must not become empty data: 'Program' would read 'active'."""
+    shared.client = VZugApi(base_url="http://example.com")
+    with (
+        patch.object(
+            shared.client._client, "get", side_effect=httpx.ConnectTimeout("")
+        ) as get,
+        pytest.raises(UpdateFailed),
+    ):
+        await shared._fetch_state()
+
+    # the warm-up is the first request, nothing else waits for the appliance
+    assert get.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_a_failing_hh_command_still_degrades_gracefully(shared):
+    """The appliance answers, just not to 'getEcoInfo': keep the rest."""
+    answers = {
+        "getZHMode": {"value": 2},
+        "getDeviceStatus": {"Inactive": "true", "Program": ""},
+        "getLastPUSHNotifications": [],
+    }
+
+    async def get(url):
+        command = url.split("command=")[1].split("&")[0]
+        if command in answers:
+            return _json_response(answers[command])
+        return _status_response(503)
+
+    shared.client = VZugApi(base_url="http://example.com")
+    with (
+        patch.object(shared.client._client, "get", side_effect=get),
+        patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        state = await shared._fetch_state()
+
+    assert state.device == {"Inactive": "true", "Program": ""}
+    assert state.eco_info == {}
+
+
+def _state_entity_shared(device) -> SimpleNamespace:
+    coord = MagicMock(last_update_success=True)
+    coord.data = AggState(
+        zh_mode=-1,
+        device=device,
+        device_fetched_at=datetime.now(UTC),
+        notifications=[],
+        eco_info={},
+    )
+    return SimpleNamespace(
+        state_coord=coord, unique_id_prefix="fc:1b:ff:06:6e:8e", device_info={}
+    )
+
+
+@pytest.mark.parametrize(
+    ("device", "expected"),
+    [
+        ({}, None),
+        ({"Inactive": "true", "Program": ""}, "standby"),
+        ({"Inactive": "false", "Program": ""}, "active"),
+        ({"Inactive": "false", "Program": "Eco"}, "Eco"),
+    ],
+)
+def test_program_does_not_guess_without_device_data(device, expected):
+    assert Program(_state_entity_shared(device)).native_value == expected
+
+
+def test_check_update_is_unavailable_with_the_appliance():
+    shared = _state_entity_shared({})
+    button = CheckUpdate(shared)
+    assert button.available
+
+    shared.state_coord.last_update_success = False
+    assert not button.available
+
+
+async def _unreachable_update(shared: Shared):
+    shared.meta = MagicMock()
+    shared.client.aggregate_update_status = AsyncMock(
+        side_effect=httpx.ConnectTimeout("")
+    )
+    shared.update_coord.data = await shared._fetch_update()
+
+
+@pytest.mark.asyncio
+async def test_unreachable_appliance_makes_the_update_unavailable(shared):
+    await _poll_update(shared, "idle")
+
+    with pytest.raises(UpdateFailed):
+        await _unreachable_update(shared)
+
+    # polled every 6 hours otherwise, it should come back along with the appliance
+    assert shared.update_coord.update_interval == UNREACHABLE_RETRY_INTERVAL
+    assert await _poll_update(shared, "idle") == UPDATE_COORD_IDLE_INTERVAL
+
+
+@pytest.mark.asyncio
+async def test_restart_into_new_firmware_keeps_watching_the_update(shared):
+    """It doesn't answer while it restarts, the carry-over is there for that."""
+    await _poll_update(shared, "installing", available=True)
+
+    await _unreachable_update(shared)
+
+    assert shared.update_coord.update_interval == UPDATE_COORD_SETTLE_INTERVAL
+    data = shared.update_coord.data
+    assert data.update["isAIUpdateAvailable"] is True
+    assert data.ai_fw_version["SW"] == "1052633-R19"
+
+
+@pytest.mark.asyncio
+async def test_unreachable_update_does_not_fail_the_setup(shared):
+    """The update status isn't essential, the setup goes on without it."""
+    await _unreachable_update(shared)
+
+    assert shared.update_coord.data.update == {}
+    assert shared.update_coord.update_interval == UPDATE_COORD_IDLE_INTERVAL
+
+
+@pytest.mark.asyncio
+async def test_unreachable_appliance_makes_the_config_unavailable(shared):
+    """The grace period is for a busy appliance, not for one that is gone."""
+    previous = {"settings": MagicMock()}
+    shared.config_coord.data = previous
+    shared._config_stale_count = 0
+    shared.client.aggregate_config = AsyncMock(side_effect=httpx.ConnectError(""))
+
+    with pytest.raises(UpdateFailed):
+        await shared._fetch_config()
+    assert shared.config_coord.update_interval == UNREACHABLE_RETRY_INTERVAL
+
+    # a bad answer still keeps the previous tree
+    shared.client.aggregate_config = AsyncMock(side_effect=ValueError("busy"))
+    assert await shared._fetch_config() is previous
+
+    shared.client.aggregate_config = AsyncMock(return_value=previous)
+    await shared._fetch_config()
+    assert shared.config_coord.update_interval == CONFIG_COORD_INTERVAL

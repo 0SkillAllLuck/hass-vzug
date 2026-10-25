@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -168,7 +170,8 @@ async def test_zh_mode_warmup_survives_a_single_failure(vzug_api):
         ) as notifications,
         patch.object(vzug_api, "get_eco_info", new_callable=AsyncMock) as eco_info,
     ):
-        zh_mode.side_effect = [httpx.ReadTimeout(""), 2, httpx.ReadTimeout(""), 2]
+        blip = httpx.RemoteProtocolError("")
+        zh_mode.side_effect = [blip, 2, blip, 2]
         notifications.return_value = []
         eco_info.return_value = {}
 
@@ -420,10 +423,53 @@ async def test_unreachable_appliance_is_tried_once(vzug_api):
         ) as connect,
         patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
     ):
-        result = await vzug_api.get_device_status(default_on_error=True)
+        with pytest.raises(httpx.ConnectError):
+            await vzug_api.get_device_status(default_on_error=True)
 
-        assert result == {}
         assert connect.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_no_answer_is_not_covered_by_the_default(vzug_api):
+    """The default is for a bad answer. Without any, the caller has to know."""
+    with patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get:
+        mock_get.side_effect = httpx.ReadTimeout("")
+
+        with pytest.raises(httpx.ReadTimeout):
+            await vzug_api.get_eco_info(default_on_error=True)
+
+
+@pytest.mark.asyncio
+async def test_bad_answer_still_uses_the_default(vzug_api, caplog):
+    """A busy appliance answering 503 is no reason to log an error every poll."""
+    with (
+        patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get,
+        patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_get.return_value = _status_response(503)
+
+        assert await vzug_api.get_eco_info(default_on_error=True) == {}
+
+        assert mock_get.call_count == 5
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+@pytest.mark.asyncio
+async def test_zh_mode_warmup_does_not_count_no_answer(vzug_api):
+    """An appliance that is switched off says nothing about 'getZHMode'."""
+    with (
+        patch.object(vzug_api, "get_zh_mode", new_callable=AsyncMock) as zh_mode,
+        patch.object(vzug_api, "get_device_status", new_callable=AsyncMock) as device,
+    ):
+        zh_mode.side_effect = httpx.ConnectTimeout("")
+
+        for _ in range(ZH_MODE_WARMUP_MAX_FAILURES):
+            with pytest.raises(httpx.ConnectTimeout):
+                await vzug_api.aggregate_state()
+
+        assert vzug_api._zh_mode_warmup_failures == 0
+        # and the rest of the poll doesn't queue up behind it
+        device.assert_not_awaited()
 
 
 @pytest.mark.asyncio

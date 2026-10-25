@@ -13,7 +13,7 @@ from .helpers import (
     add_entities_as_they_appear,
     user_config_commands,
 )
-from .shared import ProgramCoordinator, Shared
+from .shared import ProgramCoordinator, Shared, StateCoordinator
 
 
 async def async_setup_entry(
@@ -85,6 +85,9 @@ class RefreshNow(ButtonEntity):
     changed a setting on the appliance's panel, or for an automation that knows
     better than the integration does - a smart plug reporting power draw, a door
     contact, a motion sensor in the laundry room.
+
+    It stays available while the appliance doesn't answer: right after switching
+    it back on, this is the quickest way to bring its entities back.
     """
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -101,13 +104,21 @@ class RefreshNow(ButtonEntity):
         await self.shared.async_probe_device()
 
 
-class CheckUpdate(ButtonEntity):
+class CheckUpdate(CoordinatorEntity[StateCoordinator], ButtonEntity):
+    """Ask the appliance to look for new firmware.
+
+    It is only available while the appliance answers, which the state coordinator
+    knows best: it is polled every minute, the update coordinator only every few
+    hours.
+    """
+
     _attr_device_class = ButtonDeviceClass.UPDATE
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_translation_key = "check_update"
 
     def __init__(self, shared: Shared) -> None:
+        super().__init__(shared.state_coord)
         self.shared = shared
 
         self._attr_unique_id = f"{shared.unique_id_prefix}-check-update"

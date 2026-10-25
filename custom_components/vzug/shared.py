@@ -63,6 +63,10 @@ CONFIG_COORD_INTERVAL = timedelta(hours=1)
 CONFIG_MAX_STALE_UPDATES = 3
 STATE_MAX_STALE_UPDATES = 3
 
+# config and update are polled hours apart. Once the appliance stops answering,
+# they look again every minute instead, so their entities come back along with it.
+UNREACHABLE_RETRY_INTERVAL = timedelta(minutes=1)
+
 
 class Shared:
     hass: HomeAssistant
@@ -239,6 +243,8 @@ class Shared:
                 raw_programs = await self.client.get_raw_programs(attempts=2)
         except ConfigEntryAuthFailed:
             raise
+        except api.NO_ANSWER as exc:
+            raise UpdateFailed(f"no answer from the appliance: {exc!r}") from exc
         except Exception as exc:
             if previous is None:
                 raise UpdateFailed(f"program update failed: {exc!r}") from exc
@@ -263,6 +269,8 @@ class Shared:
                 raise UpdateFailed("'getProgram' returned no zones")
         except ConfigEntryAuthFailed:
             raise
+        except api.NO_ANSWER as exc:
+            raise UpdateFailed(f"no answer from the appliance: {exc!r}") from exc
         except Exception as exc:
             if previous is None or self._zone_stale_count >= ZONE_MAX_STALE_UPDATES:
                 raise UpdateFailed(f"zone update failed: {exc!r}") from exc
@@ -304,22 +312,29 @@ class Shared:
         previous = self.state_coord.data
         probe = self._device_probe_due()
 
-        async with detect_auth_failed():
-            state = await self.client.aggregate_state(
-                default_on_error=self._first_refresh_done,
-                include_device=probe,
-                include_eco=probe,
-            )
-
-            if self._note_notifications(state.notifications) and not probe:
-                # something happened at the appliance: a program finished, or a
-                # timed one started. It is awake now anyway, so this costs nothing.
-                _LOGGER.debug("new notification, fetching the full state")
-                probe = True
+        try:
+            async with detect_auth_failed():
                 state = await self.client.aggregate_state(
-                    default_on_error=self._first_refresh_done
+                    default_on_error=self._first_refresh_done,
+                    include_device=probe,
+                    include_eco=probe,
                 )
-                self.hass.async_create_task(self.config_coord.async_request_refresh())
+
+                if self._note_notifications(state.notifications) and not probe:
+                    # something happened at the appliance: a program finished, or a
+                    # timed one started. It is awake now anyway, so this costs nothing.
+                    _LOGGER.debug("new notification, fetching the full state")
+                    probe = True
+                    state = await self.client.aggregate_state(
+                        default_on_error=self._first_refresh_done
+                    )
+                    self.hass.async_create_task(
+                        self.config_coord.async_request_refresh()
+                    )
+        except api.NO_ANSWER as exc:
+            # some appliances switch off completely after a program. The coordinator
+            # marks the entities unavailable and logs it once.
+            raise UpdateFailed(f"no answer from the appliance: {exc!r}") from exc
 
         if not probe:
             return self._carry_over(state, previous)
@@ -417,10 +432,23 @@ class Shared:
 
     async def _fetch_update(self) -> api.AggUpdateStatus:
         previous = self.update_coord.data
-        async with detect_auth_failed():
-            data = await self.client.aggregate_update_status(
-                supports_update_status=self.meta.supports_update_status(),
-                default_on_error=True,  # we allow the update to fail because it's not essential
+        try:
+            async with detect_auth_failed():
+                data = await self.client.aggregate_update_status(
+                    supports_update_status=self.meta.supports_update_status(),
+                    default_on_error=True,  # we allow the update to fail because it's not essential
+                )
+        except api.NO_ANSWER as exc:
+            if previous is not None and not self._update_window_open():
+                self.update_coord.update_interval = UNREACHABLE_RETRY_INTERVAL
+                raise UpdateFailed(f"no answer from the appliance: {exc!r}") from exc
+            # restarting into new firmware, which is what the carry-over below is
+            # for, or this is the setup, which the update status mustn't fail: go on
+            # as if every request had failed on its own
+            data = api.AggUpdateStatus(
+                update=api.UpdateStatus(),
+                ai_fw_version=api.AiFwVersion(),
+                hh_fw_version=api.HhFwVersion(),
             )
 
         status = data.update.get("status")
@@ -494,11 +522,15 @@ class Shared:
                 raise UpdateFailed("getCategories returned empty")
         except ConfigEntryAuthFailed:
             raise
+        except api.NO_ANSWER as exc:
+            # the grace period is for a busy appliance, not for one that is gone
+            self.config_coord.update_interval = UNREACHABLE_RETRY_INTERVAL
+            raise UpdateFailed(f"no answer from the appliance: {exc!r}") from exc
         except Exception as exc:
             # 'previous is None' means we never had a successful update, so there is
             # nothing to keep and the caller should see the failure
             if previous is None or self._config_stale_count >= CONFIG_MAX_STALE_UPDATES:
-                raise
+                raise UpdateFailed(f"config update failed: {exc!r}") from exc
             self._config_stale_count += 1
             _LOGGER.debug(
                 "config update failed (%s/%s), keeping previous data: %r",
@@ -509,6 +541,7 @@ class Shared:
             return previous
 
         self._config_stale_count = 0
+        self.config_coord.update_interval = CONFIG_COORD_INTERVAL
         return config_tree
 
 

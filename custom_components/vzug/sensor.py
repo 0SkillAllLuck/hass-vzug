@@ -222,6 +222,9 @@ class Program(StateBase):
     @property
     def native_value(self) -> StateType | date | datetime | Decimal:
         device = self.coordinator.data.device
+        if not device:
+            # the status request failed, that says nothing about the appliance
+            return None
         if program := device.get("Program"):
             return program
         elif device.get("Inactive") == "true":
