@@ -20,9 +20,6 @@ async def async_setup_entry(
 ) -> None:
     shared = config_entry.runtime_data
     zone_coord = shared.zone_coord
-    if zone_coord is None:
-        return
-
     add_entities_when_ready(
         config_entry,
         zone_coord,

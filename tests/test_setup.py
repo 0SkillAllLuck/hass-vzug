@@ -16,7 +16,11 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from custom_components.vzug import async_setup_entry, async_unload_entry
 from custom_components.vzug.api import VZugApi
 from custom_components.vzug.const import CONF_BASE_URL
-from custom_components.vzug.shared import UNREACHABLE_RETRY_AFTER, Shared
+from custom_components.vzug.shared import (
+    DETECTION_RETRY_INTERVAL,
+    UNREACHABLE_RETRY_AFTER,
+    Shared,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -99,6 +103,8 @@ class Setup:
         )
         self.on_unload: list = []
         self.entry.async_on_unload = self.on_unload.append
+        # what 'async_call_later' was asked to run, with its delay
+        self.later: list = []
 
     def _add(self, entities, update_before_add=False) -> None:
         for entity in entities:
@@ -119,6 +125,7 @@ class Setup:
         self._patches = [
             patch.object(httpx.AsyncClient, "get", self.appliance.get),
             patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+            patch("custom_components.vzug.shared.async_call_later", self._call_later),
         ]
         for p in self._patches:
             p.start()
@@ -129,6 +136,16 @@ class Setup:
             target.close()
         for p in self._patches:
             p.stop()
+
+    def _call_later(self, hass, delay, action):
+        self.later.append((delay, action))
+        return MagicMock()
+
+    async def run_later(self) -> None:
+        """Let the time pass for what 'async_call_later' was asked to run."""
+        while self.later:
+            self.later.pop(0)[1](None)
+            await self.run_background()
 
     async def setup(self) -> int:
         """Set the entry up, returning the number of requests it took."""
@@ -182,8 +199,6 @@ async def test_setup_only_waits_for_meta_and_state(device):
             "getZHMode",
             "getLastPUSHNotifications",
             "getEcoInfo",
-            # which coordinator the zone or program entities listen to
-            "getProgram",
         ]
         assert set(_coordinators(setup)) == {"state"}
         # from the firmware 'aggregate_meta' fetched anyway
@@ -286,6 +301,51 @@ async def test_the_rest_arrives_after_the_setup(device, coordinators):
         await setup.run_background()
 
         assert set(_coordinators(setup)) == coordinators
+        # nothing to ask again
+        assert setup.later == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("device", "busy", "coordinator"),
+    [
+        (OVEN, "getProgram", "zones"),
+        (DISHWASHER, "getProgram", "programs"),
+        (DISHWASHER, "getAllProgramIds", "programs"),
+    ],
+)
+async def test_failing_detection_is_retried(device, busy, coordinator):
+    """A busy appliance must not keep its zones or programs away until a reload."""
+    with Setup(device) as setup:
+        setup.appliance.busy.add(busy)
+        await setup.setup()
+        await setup.run_background()
+
+        assert coordinator not in _coordinators(setup)
+        assert [delay for delay, _ in setup.later] == [DETECTION_RETRY_INTERVAL]
+
+        # still busy: asked again, no more often
+        setup.later.pop()[1](None)
+        await setup.run_background()
+        assert coordinator not in _coordinators(setup)
+        assert len(setup.later) == 1
+
+        setup.appliance.busy.clear()
+        await setup.run_later()
+        assert coordinator in _coordinators(setup)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("device", ["adora_slq", "adora_tslq_wp"])
+async def test_unsupported_detection_is_not_retried(device):
+    """Adora SLQ / TSLQ don't know 'getProgram', asking again won't change that."""
+    with Setup(device) as setup:
+        await setup.setup()
+        await setup.run_background()
+
+        assert set(_coordinators(setup)) == {"state", "update", "config"}
+        assert setup.appliance.requests.count("getProgram") == 1
+        assert setup.later == []
 
 
 @pytest.mark.asyncio
@@ -306,7 +366,8 @@ async def test_unchanged_answers_leave_the_entities_alone(device):
                 shared.zone_coord,
                 shared.program_coord,
             )
-            if coord is not None
+            # the other one of zones and programs is never used
+            if coord.data is not None
         ]
         assert len(coordinators) == 4
         for coord in coordinators:

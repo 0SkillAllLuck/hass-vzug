@@ -5,10 +5,11 @@ from datetime import UTC, datetime, timedelta
 
 import yarl
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from . import api, zones
@@ -51,6 +52,10 @@ ProgramCoordinator = DataUpdateCoordinator[zones.ProgramState]
 # Home Assistant right away.
 PROGRAM_COORD_INTERVAL = STATE_COORD_IDLE_PROBE_INTERVAL
 
+# a busy appliance may not tell whether it has zones or programs. It is asked again
+# as often as the standby status probe wakes it anyway, until it does.
+DETECTION_RETRY_INTERVAL = STATE_COORD_IDLE_PROBE_INTERVAL
+
 ConfigCoordinator = DataUpdateCoordinator[api.AggConfig]
 # the config tree is a snapshot of the appliance's settings, so it barely ever
 # changes on its own. Polling it every few minutes only widens the window for the
@@ -81,8 +86,8 @@ class Shared:
     state_coord: StateCoordinator
     update_coord: UpdateCoordinator
     config_coord: ConfigCoordinator
-    zone_coord: ZoneCoordinator | None
-    program_coord: ProgramCoordinator | None
+    zone_coord: ZoneCoordinator
+    program_coord: ProgramCoordinator
 
     unique_id_prefix: str
     meta: api.AggMeta
@@ -132,9 +137,25 @@ class Shared:
             update_method=self._fetch_config,
         )
 
-        # only created for appliances that report zones, see '_setup_zones'
-        self.zone_coord = None
-        self.program_coord = None
+        # both idle until '_detect' finds out which of them this appliance needs. The
+        # platforms listen to both, so the entities appear whenever that is.
+        self.zone_coord = DataUpdateCoordinator(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            always_update=False,
+            name="zones",
+            update_method=self._fetch_zones,
+        )
+        self.program_coord = DataUpdateCoordinator(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            always_update=False,
+            name="programs",
+            update_method=self._fetch_programs,
+        )
+        self._cancel_detection: CALLBACK_TYPE | None = None
         self._program_names: dict[int, str] = {}
         self._zone_modes: tuple[str, ...] = ()
         self._zone_stale_count = 0
@@ -168,7 +189,6 @@ class Shared:
             ) from exc
 
         await self.state_coord.async_config_entry_first_refresh()
-        await self._setup_zones()
 
         try:
             await self._post_first_refresh()
@@ -185,59 +205,57 @@ class Shared:
         retried by the coordinator's polling, which their listeners keep going.
         """
         await self.update_coord.async_refresh()
-        if self.zone_coord is not None:
-            await self._refresh_zones()
+        await self._detect()
         await self.config_coord.async_refresh()
-        if self.program_coord is not None:
-            await self._setup_programs()
 
     async def async_shutdown(self) -> None:
+        if self._cancel_detection is not None:
+            self._cancel_detection()
         await self.state_coord.async_shutdown()
         await self.update_coord.async_shutdown()
         await self.config_coord.async_shutdown()
-        if self.zone_coord is not None:
-            await self.zone_coord.async_shutdown()
-        if self.program_coord is not None:
-            await self.program_coord.async_shutdown()
+        await self.zone_coord.async_shutdown()
+        await self.program_coord.async_shutdown()
         await self.client.aclose()
 
-    async def _setup_zones(self) -> None:
-        """Find out whether this appliance has zones.
+    async def _detect(self) -> None:
+        """Find out whether this appliance has zones or programs, and set them up.
 
-        The platforms need to know which coordinator to listen to, everything else
-        is left to 'async_refresh_the_rest'. Dishwashers and washing machines answer
-        'getProgram' with a single entry without a zone, they get a program
-        coordinator instead. It stays idle until '_setup_programs' finds names.
+        Refrigerators and ovens answer 'getProgram' with one entry per zone,
+        dishwashers and washing machines with a single entry without a zone. Without
+        an answer it is tried again later: the entities only appear after this.
         """
+        self._cancel_detection = None
         try:
             raw_programs = await self.client.get_raw_programs(attempts=2)
         except Exception as exc:
-            _LOGGER.debug("'getProgram' failed, assuming no zones: %r", exc)
-            return
-        if not zones.has_zones(raw_programs):
-            self.program_coord = DataUpdateCoordinator(
-                self.hass,
-                _LOGGER,
-                config_entry=self.entry,
-                always_update=False,
-                name="programs",
-                update_method=self._fetch_programs,
+            if api.is_unsupported(exc):
+                # ex. Adora SLQ: no zones and no programs, for good
+                _LOGGER.debug("'getProgram' not supported: %r", exc)
+                return
+            _LOGGER.debug("'getProgram' failed, trying again later: %r", exc)
+            done = False
+        else:
+            if zones.has_zones(raw_programs):
+                await self._refresh_zones()
+                # its own polling takes over from here
+                done = True
+            else:
+                done = await self._setup_programs()
+        if not done:
+            self._cancel_detection = async_call_later(
+                self.hass, DETECTION_RETRY_INTERVAL, self._retry_detection
             )
-            return
 
-        self.zone_coord = DataUpdateCoordinator(
-            self.hass,
-            _LOGGER,
-            config_entry=self.entry,
-            always_update=False,
-            name="zones",
-            update_interval=ZONE_COORD_INTERVAL,
-            update_method=self._fetch_zones,
+    @callback
+    def _retry_detection(self, _now: datetime) -> None:
+        # tied to the entry, so an unload cancels it before the client is closed
+        self.entry.async_create_background_task(
+            self.hass, self._detect(), f"{DOMAIN} zone and program detection"
         )
 
     async def _refresh_zones(self) -> None:
         """Learn which modes the appliance knows, then fetch the zones."""
-        assert self.zone_coord is not None
         supported: list[str] = []
         for mode in zones.ALL_MODES:
             try:
@@ -247,35 +265,44 @@ class Shared:
             else:
                 supported.append(mode)
         self._zone_modes = tuple(supported)
+        self.zone_coord.update_interval = ZONE_COORD_INTERVAL
         await self.zone_coord.async_refresh()
 
-    async def _setup_programs(self) -> None:
-        """Learn the names of the programs this appliance offers (dishwashers)."""
-        assert self.program_coord is not None
+    async def _setup_programs(self) -> bool:
+        """Learn the names of the programs this appliance offers (dishwashers).
+
+        False if the appliance didn't tell, and it should be asked again later.
+        """
         try:
             program_ids = await self.client.get_all_program_ids()
         except Exception as exc:
             _LOGGER.debug("'getAllProgramIds' failed, no program select: %r", exc)
-            return
+            return api.is_unsupported(exc)
 
         names: dict[int, str] = {}
+        failed = False
         for program_id in program_ids:
             try:
                 details = await self.client.get_program_details(program_id)
             except Exception as exc:
                 _LOGGER.debug("no details for program %s: %r", program_id, exc)
+                failed = True
                 continue
             if name := details.get("name"):
                 names[program_id] = name
         if not names:
-            return
+            # a busy appliance answers '200 []' or fails. Programs that all answer
+            # without a name are an answer: nothing to select, the coordinator
+            # stays idle.
+            return bool(program_ids) and not failed
 
         self._program_names = names
         self.program_coord.update_interval = PROGRAM_COORD_INTERVAL
         await self.program_coord.async_refresh()
+        return True
 
     async def _fetch_programs(self) -> zones.ProgramState:
-        previous = self.program_coord.data if self.program_coord else None
+        previous = self.program_coord.data
         try:
             async with detect_auth_failed():
                 raw_programs = await self.client.get_raw_programs(attempts=2)
@@ -294,7 +321,7 @@ class Shared:
         )
 
     async def _fetch_zones(self) -> zones.ZoneState:
-        previous = self.zone_coord.data if self.zone_coord else None
+        previous = self.zone_coord.data
         try:
             async with detect_auth_failed():
                 raw_programs = await self.client.get_raw_programs(attempts=2)

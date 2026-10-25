@@ -26,13 +26,12 @@ async def async_setup_entry(
 ) -> None:
     shared = config_entry.runtime_data
 
-    if shared.program_coord is not None:
-        add_entities_when_ready(
-            config_entry,
-            shared.program_coord,
-            async_add_entities,
-            lambda: [ProgramSelect(shared)],
-        )
+    add_entities_when_ready(
+        config_entry,
+        shared.program_coord,
+        async_add_entities,
+        lambda: [ProgramSelect(shared)],
+    )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
         if command.get("type") == "selection" and command.get("alterable", True):
@@ -58,7 +57,6 @@ class ProgramSelect(CoordinatorEntity[ProgramCoordinator], SelectEntity):
     _attr_translation_key = "program_select"
 
     def __init__(self, shared: Shared) -> None:
-        assert shared.program_coord is not None
         super().__init__(shared.program_coord)
         self.shared = shared
         self._attr_unique_id = f"{shared.unique_id_prefix}-program-select"

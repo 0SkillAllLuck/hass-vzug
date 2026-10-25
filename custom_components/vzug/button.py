@@ -33,13 +33,12 @@ async def async_setup_entry(
 
     async_add_entities(entities)
 
-    if shared.program_coord is not None:
-        add_entities_when_ready(
-            config_entry,
-            shared.program_coord,
-            async_add_entities,
-            lambda: [SendProgram(shared)],
-        )
+    add_entities_when_ready(
+        config_entry,
+        shared.program_coord,
+        async_add_entities,
+        lambda: [SendProgram(shared)],
+    )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
         if command.get("type") == "action":
@@ -66,7 +65,6 @@ class SendProgram(CoordinatorEntity[ProgramCoordinator], ButtonEntity):
     _attr_translation_key = "send_program"
 
     def __init__(self, shared: Shared) -> None:
-        assert shared.program_coord is not None
         super().__init__(shared.program_coord)
         self.shared = shared
         self._attr_unique_id = f"{shared.unique_id_prefix}-send-program"

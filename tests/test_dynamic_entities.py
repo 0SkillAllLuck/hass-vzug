@@ -53,7 +53,7 @@ def _setup(config, eco_info=None):
     shared = SimpleNamespace(
         config_coord=FakeCoordinator(config),
         state_coord=FakeCoordinator(_state(eco_info or {})),
-        zone_coord=None,
+        zone_coord=FakeCoordinator(None),
         unique_id_prefix=PREFIX,
         device_info={},
     )
@@ -96,7 +96,8 @@ async def test_busy_appliance_at_startup():
     shared.config_coord.update({})
     shared.config_coord.update(_config(settings=[_SOUND]))
     assert added == [[f"{PREFIX}-userconfig-settings-sound"]]
-    entry.async_on_unload.assert_called_once()
+    # one listener each for the zones and the config tree, not one per update
+    assert entry.async_on_unload.call_count == 2
 
 
 @pytest.mark.asyncio

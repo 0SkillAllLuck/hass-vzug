@@ -31,9 +31,7 @@ TO_REDACT: set[str] = {
 }
 
 
-def _coordinator(coord: DataUpdateCoordinator[Any] | None) -> dict[str, Any] | None:
-    if coord is None:
-        return None
+def _coordinator(coord: DataUpdateCoordinator[Any]) -> dict[str, Any]:
     data = coord.data
     if isinstance(data, dict):
         # the config tree
