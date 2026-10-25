@@ -15,7 +15,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components.vzug import async_setup_entry, async_unload_entry
 from custom_components.vzug.const import CONF_BASE_URL
-from custom_components.vzug.shared import UNREACHABLE_RETRY_INTERVAL, Shared
+from custom_components.vzug.shared import UNREACHABLE_RETRY_AFTER, Shared
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -256,12 +256,18 @@ async def test_failing_background_refresh_is_retried():
         assert "config" not in _coordinators(setup)
         # the listener waiting for its entities keeps the polling going, and it
         # doesn't wait the usual hour
-        assert config.update_interval == UNREACHABLE_RETRY_INTERVAL
-        assert config._unsub_refresh is not None
+        assert _seconds_to_next_refresh(config) <= UNREACHABLE_RETRY_AFTER + 1
 
         setup.appliance.busy.clear()
         await config._handle_refresh_interval()
         assert "config" in _coordinators(setup)
+        # back to the usual hour on its own
+        assert _seconds_to_next_refresh(config) > UNREACHABLE_RETRY_AFTER + 1
+
+
+def _seconds_to_next_refresh(coord) -> float:
+    assert coord._unsub_refresh is not None
+    return coord._unsub_refresh.__self__.when() - coord.hass.loop.time()
 
 
 @pytest.mark.asyncio

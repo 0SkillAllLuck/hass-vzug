@@ -65,8 +65,9 @@ CONFIG_MAX_STALE_UPDATES = 3
 STATE_MAX_STALE_UPDATES = 3
 
 # config and update are polled hours apart. Once the appliance stops answering,
-# they look again every minute instead, so their entities come back along with it.
-UNREACHABLE_RETRY_INTERVAL = timedelta(minutes=1)
+# they look again a minute later instead, so their entities come back along with it.
+# Only the next refresh is moved, after that their own interval applies again.
+UNREACHABLE_RETRY_AFTER = 60  # seconds
 
 type VZugConfigEntry = ConfigEntry[Shared]
 
@@ -482,8 +483,10 @@ class Shared:
                 )
         except api.NO_ANSWER as exc:
             if previous is not None and not self._update_window_open():
-                self.update_coord.update_interval = UNREACHABLE_RETRY_INTERVAL
-                raise UpdateFailed(f"no answer from the appliance: {exc!r}") from exc
+                raise UpdateFailed(
+                    f"no answer from the appliance: {exc!r}",
+                    retry_after=UNREACHABLE_RETRY_AFTER,
+                ) from exc
             # restarting into new firmware, which is what the carry-over below is
             # for, or this is the setup, which the update status mustn't fail: go on
             # as if every request had failed on its own
@@ -566,15 +569,20 @@ class Shared:
             raise
         except api.NO_ANSWER as exc:
             # the grace period is for a busy appliance, not for one that is gone
-            self.config_coord.update_interval = UNREACHABLE_RETRY_INTERVAL
-            raise UpdateFailed(f"no answer from the appliance: {exc!r}") from exc
+            raise UpdateFailed(
+                f"no answer from the appliance: {exc!r}",
+                retry_after=UNREACHABLE_RETRY_AFTER,
+            ) from exc
         except Exception as exc:
             # 'previous is None' means we never had a successful update, so there is
             # nothing to keep and the caller should see the failure
             if previous is None:
                 # its entities only appear with the first tree, don't wait an hour
-                self.config_coord.update_interval = UNREACHABLE_RETRY_INTERVAL
-            if previous is None or self._config_stale_count >= CONFIG_MAX_STALE_UPDATES:
+                raise UpdateFailed(
+                    f"config update failed: {exc!r}",
+                    retry_after=UNREACHABLE_RETRY_AFTER,
+                ) from exc
+            if self._config_stale_count >= CONFIG_MAX_STALE_UPDATES:
                 raise UpdateFailed(f"config update failed: {exc!r}") from exc
             self._config_stale_count += 1
             _LOGGER.debug(
@@ -586,7 +594,6 @@ class Shared:
             return previous
 
         self._config_stale_count = 0
-        self.config_coord.update_interval = CONFIG_COORD_INTERVAL
         return config_tree
 
 
