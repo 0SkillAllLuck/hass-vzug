@@ -142,7 +142,6 @@ class Shared:
 
         # the rest will be set on first refresh
         self.unique_id_prefix = ""
-        self.device_info = DeviceInfo()
         self._first_refresh_done = False
         self._config_stale_count = 0
         self._eco_stale_count = 0
@@ -331,16 +330,16 @@ class Shared:
                 "unable to determine unique id from device data: %s", self.meta
             )
 
-        self.device_info.update(
-            DeviceInfo(
-                configuration_url=str(self.client.base_url),
-                identifiers={(DOMAIN, self.meta.serial_number)},
-                name=self.meta.create_name(),
-                hw_version=self.meta.ai_fw_version.get("HW"),
-                sw_version=self.meta.ai_fw_version.get("SW"),
-                connections={(dr.CONNECTION_NETWORK_MAC, mac_addr)},
-                model=self.meta.model_name,
-            )
+        # built in one go, the entities are only created after this. Since HA 2026.11
+        # it is a dataclass, '.update()' only works through a compatibility layer.
+        self.device_info = DeviceInfo(
+            configuration_url=str(self.client.base_url),
+            identifiers={(DOMAIN, self.meta.serial_number)},
+            name=self.meta.create_name(),
+            hw_version=self.meta.ai_fw_version.get("HW"),
+            sw_version=self.meta.ai_fw_version.get("SW"),
+            connections={(dr.CONNECTION_NETWORK_MAC, mac_addr)},
+            model=self.meta.model_name,
         )
 
         self._first_refresh_done = True
