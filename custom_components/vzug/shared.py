@@ -103,6 +103,7 @@ class Shared:
         self.state_coord = DataUpdateCoordinator(
             hass,
             _LOGGER,
+            config_entry=entry,
             name="state",
             update_interval=STATE_COORD_ACTIVE_INTERVAL,
             update_method=self._fetch_state,
@@ -110,6 +111,7 @@ class Shared:
         self.update_coord = DataUpdateCoordinator(
             hass,
             _LOGGER,
+            config_entry=entry,
             name="update",
             update_interval=UPDATE_COORD_IDLE_INTERVAL,
             update_method=self._fetch_update,
@@ -117,6 +119,7 @@ class Shared:
         self.config_coord = DataUpdateCoordinator(
             hass,
             _LOGGER,
+            config_entry=entry,
             name="config",
             update_interval=CONFIG_COORD_INTERVAL,
             update_method=self._fetch_config,
@@ -209,6 +212,7 @@ class Shared:
             self.program_coord = DataUpdateCoordinator(
                 self.hass,
                 _LOGGER,
+                config_entry=self.entry,
                 name="programs",
                 update_method=self._fetch_programs,
             )
@@ -217,6 +221,7 @@ class Shared:
         self.zone_coord = DataUpdateCoordinator(
             self.hass,
             _LOGGER,
+            config_entry=self.entry,
             name="zones",
             update_interval=ZONE_COORD_INTERVAL,
             update_method=self._fetch_zones,

@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from homeassistant.config_entries import ConfigEntryState, current_entry
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components.vzug import async_setup_entry, async_unload_entry
@@ -115,8 +115,6 @@ class Setup:
 
     def __enter__(self) -> "Setup":
         self.hass.loop = asyncio.get_running_loop()
-        # the coordinators find their entry the same way during a real setup
-        self._token = current_entry.set(self.entry)
         self._patches = [
             patch.object(httpx.AsyncClient, "get", self.appliance.get),
             patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
@@ -130,7 +128,6 @@ class Setup:
             target.close()
         for p in self._patches:
             p.stop()
-        current_entry.reset(self._token)
 
     async def setup(self) -> int:
         """Set the entry up, returning the number of requests it took."""
