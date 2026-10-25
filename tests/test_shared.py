@@ -16,7 +16,6 @@ from custom_components.vzug.api import (
 from custom_components.vzug.button import CheckUpdate
 from custom_components.vzug.sensor import Program
 from custom_components.vzug.shared import (
-    CONFIG_COORD_INTERVAL,
     STATE_COORD_ACTIVE_INTERVAL,
     STATE_COORD_IDLE_INTERVAL,
     STATE_COORD_IDLE_PROBE_INTERVAL,
@@ -25,7 +24,7 @@ from custom_components.vzug.shared import (
     UPDATE_COORD_IDLE_INTERVAL,
     UPDATE_COORD_SETTLE_INTERVAL,
     UPDATE_COORD_SETTLE_PERIOD,
-    UNREACHABLE_RETRY_INTERVAL,
+    UNREACHABLE_RETRY_AFTER,
     Shared,
 )
 
@@ -573,12 +572,12 @@ async def _unreachable_update(shared: Shared):
 async def test_unreachable_appliance_makes_the_update_unavailable(shared):
     await _poll_update(shared, "idle")
 
-    with pytest.raises(UpdateFailed):
+    with pytest.raises(UpdateFailed) as failed:
         await _unreachable_update(shared)
 
     # polled every 6 hours otherwise, it should come back along with the appliance
-    assert shared.update_coord.update_interval == UNREACHABLE_RETRY_INTERVAL
-    assert await _poll_update(shared, "idle") == UPDATE_COORD_IDLE_INTERVAL
+    assert failed.value.retry_after == UNREACHABLE_RETRY_AFTER
+    assert shared.update_coord.update_interval == UPDATE_COORD_IDLE_INTERVAL
 
 
 @pytest.mark.asyncio
@@ -611,14 +610,10 @@ async def test_unreachable_appliance_makes_the_config_unavailable(shared):
     shared._config_stale_count = 0
     shared.client.aggregate_config = AsyncMock(side_effect=httpx.ConnectError(""))
 
-    with pytest.raises(UpdateFailed):
+    with pytest.raises(UpdateFailed) as failed:
         await shared._fetch_config()
-    assert shared.config_coord.update_interval == UNREACHABLE_RETRY_INTERVAL
+    assert failed.value.retry_after == UNREACHABLE_RETRY_AFTER
 
     # a bad answer still keeps the previous tree
     shared.client.aggregate_config = AsyncMock(side_effect=ValueError("busy"))
     assert await shared._fetch_config() is previous
-
-    shared.client.aggregate_config = AsyncMock(return_value=previous)
-    await shared._fetch_config()
-    assert shared.config_coord.update_interval == CONFIG_COORD_INTERVAL

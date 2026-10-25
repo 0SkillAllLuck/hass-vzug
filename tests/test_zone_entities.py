@@ -36,7 +36,9 @@ def _shared(raw=COMBI_COOLER, modes=MODES):
         zone_coord=coord,
         client=MagicMock(set_zone_value=AsyncMock(), set_cmd_value=AsyncMock()),
         unique_id_prefix="fc:1b:ff:06:6e:8e",
-        device_info={},
+        meta=SimpleNamespace(serial_number="12345 123456"),
+        device_info={"name": "Kitchen Refrigerator"},
+        device_id="appliance-device-id",
         boost_hours={},
     )
     return shared
@@ -85,7 +87,7 @@ def test_no_entities_without_zones():
 async def test_temperature():
     shared = _shared()
     fridge = ZoneTemperature(shared, zone="fridge1")
-    assert fridge.translation_key == "temperature_fridge"
+    assert fridge.translation_key == "temperature"
     assert (fridge.native_value, fridge.native_min_value, fridge.native_max_value) == (
         6.0,
         3.0,
@@ -152,7 +154,63 @@ def test_doors():
     shared = _shared()
     assert Door(shared, zone="fridge1").is_on is False
     assert Door(shared, zone="freezer1").is_on is True
-    assert Door(shared, zone="freezer1").translation_key == "door_freezer"
+    assert Door(shared, zone="freezer1").translation_key == "door"
+
+
+def test_fridge_and_freezer_get_a_device_of_their_own():
+    shared = _shared()
+    entities = [
+        *number_entities(shared),
+        *switch_entities(shared),
+        *sensor_entities(shared),
+        Door(shared, zone="fridge1"),
+        Door(shared, zone="freezer1"),
+    ]
+    by_device = {}
+    for entity in entities:
+        info = entity.device_info
+        device = info.get("translation_key") or info.get("name")
+        by_device.setdefault(device, []).append((entity.vzug_zone, entity.vzug_key))
+
+    assert by_device == {
+        "fridge": [
+            ("fridge1", "temp"),
+            ("fridge1", "superCool"),
+            ("fridge1", "superCool"),
+            ("fridge1", "superCool"),
+            ("fridge1", "doorClosed"),
+        ],
+        "freezer": [
+            ("freezer1", "temp"),
+            ("freezer1", "superFreeze"),
+            ("freezer1", "superFreeze"),
+            ("freezer1", "superFreeze"),
+            ("freezer1", "doorClosed"),
+        ],
+        # whole-appliance settings, and the kitchen timer
+        "Kitchen Refrigerator": [
+            ("fridge1", "partyCooling"),
+            ("countdown1", "duration"),
+            ("fridge1", "partyCooling"),
+            ("", "HolidayMode"),
+            ("", "SilentPlusMode"),
+            ("fridge1", "partyCooling"),
+            ("", "SabbatMode"),
+        ],
+    }
+    fridge = Door(shared, zone="fridge1").device_info
+    assert fridge["identifiers"] == {("vzug", "12345 123456-fridge1")}
+    assert fridge["parent_device_id"] == "appliance-device-id"
+
+
+def test_unknown_zone_stays_on_the_appliance():
+    shared = _shared(
+        raw=[{"zone": "cellar1", "temp": {"set": 12.0}, "doorClosed": True}]
+    )
+    temperature = ZoneTemperature(shared, zone="cellar1")
+    assert temperature.device_info == shared.device_info
+    assert temperature.translation_key is None
+    assert temperature.name == "Temperature cellar1"
 
 
 def test_zone_disappearing_makes_entities_unavailable():

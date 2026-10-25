@@ -6,6 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.device_registry import ChildDeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import UndefinedType
@@ -173,7 +174,17 @@ class ZoneEntity(CoordinatorEntity[ZoneCoordinator]):
         self.vzug_key = key
 
         self._attr_unique_id = f"{shared.unique_id_prefix}-zone-{zone or 'all'}-{key}"
-        self._attr_device_info = shared.device_info
+        label = zone_label(zone)
+        if label in KNOWN_ZONE_LABELS and key != zones.PARTY_KEY:
+            # the fridge and the freezer are parts of the appliance with entities of
+            # their own. PartyCooling covers the whole appliance, it stays with it.
+            self._attr_device_info = ChildDeviceInfo(
+                identifiers={(DOMAIN, f"{shared.meta.serial_number}-{zone}")},
+                parent_device_id=shared.device_id,
+                translation_key=label,
+            )
+        else:
+            self._attr_device_info = shared.device_info
 
     @property
     def zone_data(self) -> zones.Zone | None:
@@ -213,9 +224,9 @@ KNOWN_ZONE_LABELS = ("fridge", "freezer")
 
 def zone_translation(prefix: str, zone: str) -> tuple[str | None, str | None]:
     """(translation_key, fallback name) for an entity about one zone."""
-    label = zone_label(zone)
-    if label in KNOWN_ZONE_LABELS:
-        return f"{prefix}_{label}", None
+    if zone_label(zone) in KNOWN_ZONE_LABELS:
+        # on the zone's own device, whose name already says which zone it is
+        return prefix, None
     return None, f"{prefix.replace('_', ' ').capitalize()} {zone}"
 
 

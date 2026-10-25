@@ -55,6 +55,14 @@
             }
         }
     },
+    "device": {
+        "fridge": {
+            "name": "Réfrigérateur"
+        },
+        "freezer": {
+            "name": "Congélateur"
+        }
+    },
     "entity": {
         "button": {
             "check_update": {
@@ -128,19 +136,13 @@
             }
         },
         "binary_sensor": {
-            "door_fridge": {
-                "name": "Porte réfrigérateur"
-            },
-            "door_freezer": {
-                "name": "Porte congélateur"
+            "door": {
+                "name": "Porte"
             }
         },
         "number": {
-            "temperature_fridge": {
-                "name": "Température réfrigérateur"
-            },
-            "temperature_freezer": {
-                "name": "Température congélateur"
+            "temperature": {
+                "name": "Température"
             },
             "duration_super_cool": {
                 "name": "Durée réfrigération rapide"

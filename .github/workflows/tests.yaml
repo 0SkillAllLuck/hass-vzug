@@ -16,9 +16,7 @@ jobs:
         include:
           # The minimum, pinned in requirements.txt to match hacs.json
           - homeassistant: "minimum"
-            python-version: "3.13"
-            # aiodns 3.4.0, pinned by HA 2025.6, breaks with pycares 5
-            extra: "pycares<5"
+            python-version: "3.14"
           # The latest stable release, so new HA releases show up here first
           - homeassistant: "latest"
             python-version: "3.14"
@@ -39,7 +37,7 @@ jobs:
           if [ "${{ matrix.homeassistant }}" = "latest" ]; then
             sed -i '/^homeassistant==/d' requirements.txt
           fi
-          python3 -m pip install -r requirements.txt "${{ matrix.extra }}"
+          python3 -m pip install -r requirements.txt ${{ matrix.extra }}
           python3 -m pip show homeassistant | grep '^Version'
 
       - name: "Run"
