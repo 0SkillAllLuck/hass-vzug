@@ -8,13 +8,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
+from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from custom_components.vzug import api, zones
+from custom_components.vzug import api, number, select, switch, zones
 from custom_components.vzug.button import SendProgram
 from custom_components.vzug.helpers import action_errors
 from custom_components.vzug.number import Timer
 from custom_components.vzug.select import ProgramSelect
+from custom_components.vzug.sensor import UserConfigSensor
 from custom_components.vzug.switch import Mode
 
 from .test_update_install import _entity as _update_entity
@@ -135,7 +137,96 @@ def test_every_exception_is_translated():
             r'translation_domain=DOMAIN,\s*translation_key="(\w+)"', path.read_text()
         )
     }
-    assert used >= {"auth_failed", "no_answer", "request_failed", "unknown_program"}
+    assert used >= {
+        "auth_failed",
+        "no_answer",
+        "request_failed",
+        "unknown_program",
+        "setting_locked",
+    }
     for lang in ("en", "de", "fr"):
         strings = json.loads((COMPONENT / "translations" / f"{lang}.json").read_text())
         assert set(strings["exceptions"]) == used, lang
+
+
+def _config_shared(**command):
+    coord = MagicMock()
+    coord.data = {
+        "cat": api.AggCategory(
+            key="cat",
+            description="cat",
+            commands={"cmd": {"command": "cmd", **command}},
+        )
+    }
+    coord.async_request_refresh = AsyncMock()
+    return SimpleNamespace(
+        config_coord=coord,
+        client=MagicMock(set_command=AsyncMock()),
+        unique_id_prefix="fc:1b:ff:00:00:00",
+        device_info={},
+    )
+
+
+_SETTINGS = [
+    (
+        switch.UserConfig,
+        {"type": "boolean", "value": "true"},
+        "is_on",
+        True,
+        lambda e: e.async_turn_off(),
+    ),
+    (
+        select.UserConfig,
+        {"type": "selection", "value": "a", "options": ["a", "b"]},
+        "current_option",
+        "a",
+        lambda e: e.async_select_option("b"),
+    ),
+    (
+        number.UserConfig,
+        {"type": "range", "value": "3", "minMax": ["0", "5"]},
+        "native_value",
+        3,
+        lambda e: e.async_set_native_value(4),
+    ),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("cls", "command", "attr", "value", "change"), _SETTINGS)
+async def test_locked_setting_shows_its_value_and_refuses_changes(
+    cls, command, attr, value, change
+):
+    # what a dishwasher reports for every setting while a program runs
+    shared = _config_shared(**command, alterable=False)
+    entity = cls(shared, category_key="cat", command_key="cmd")
+    assert getattr(entity, attr) == value
+    assert entity.entity_category is EntityCategory.CONFIG
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await change(entity)
+    assert raised.value.translation_key == "setting_locked"
+    shared.client.set_command.assert_not_awaited()
+
+    # the program is over, the next config refresh unlocks it
+    shared.config_coord.data["cat"].commands["cmd"]["alterable"] = True
+    await change(entity)
+    shared.client.set_command.assert_awaited_once()
+    assert entity.entity_category is EntityCategory.CONFIG
+
+
+@pytest.mark.asyncio
+async def test_setting_without_alterable_can_be_changed():
+    # older firmware doesn't send 'alterable'
+    shared = _config_shared(type="boolean", value="false")
+    await switch.UserConfig(
+        shared, category_key="cat", command_key="cmd"
+    ).async_turn_on()
+    shared.client.set_command.assert_awaited_once_with("cmd", "true")
+
+
+def test_status_setting_is_diagnostic():
+    for alterable in (True, False):
+        shared = _config_shared(type="status", value="7", alterable=alterable)
+        entity = UserConfigSensor(shared, category_key="cat", command_key="cmd")
+        assert entity.entity_category is EntityCategory.DIAGNOSTIC

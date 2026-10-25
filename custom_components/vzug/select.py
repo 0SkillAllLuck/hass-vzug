@@ -34,7 +34,7 @@ async def async_setup_entry(
     )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
-        if command.get("type") == "selection" and command.get("alterable", True):
+        if command.get("type") == "selection":
             return UserConfig(shared, category_key=key[0], command_key=key[1])
         return None
 
@@ -107,6 +107,7 @@ class UserConfig(SelectEntity, UserConfigEntity):
         return self.vzug_command.get("options", [])
 
     async def async_select_option(self, option: str) -> None:
+        self.ensure_alterable()
         async with action_errors(self.shared):
             await self.shared.client.set_command(self.vzug_command_key, option)
         await self.coordinator.async_request_refresh()

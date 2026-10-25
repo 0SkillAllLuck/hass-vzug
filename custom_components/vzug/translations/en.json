@@ -208,6 +208,9 @@
         },
         "unknown_update_component": {
             "message": "The appliance offers an update for {name}, which this integration can't install."
+        },
+        "setting_locked": {
+            "message": "The appliance doesn't allow changing this setting right now, for example while a program is running."
         }
     }
 }

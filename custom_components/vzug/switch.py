@@ -34,7 +34,7 @@ async def async_setup_entry(
     )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
-        if command.get("type") == "boolean" and command.get("alterable", True):
+        if command.get("type") == "boolean":
             return UserConfig(shared, category_key=key[0], command_key=key[1])
         return None
 
@@ -139,6 +139,7 @@ class UserConfig(SwitchEntity, UserConfigEntity):
         await self._vzug_set_state(False)
 
     async def _vzug_set_state(self, on: bool) -> None:
+        self.ensure_alterable()
         async with action_errors(self.shared):
             await self.shared.client.set_command(
                 self.vzug_command_key, "true" if on else "false"
