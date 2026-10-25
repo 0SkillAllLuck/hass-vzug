@@ -365,6 +365,9 @@ class LastNotification(StateBase):
 
 
 class UserConfigSensor(SensorEntity, UserConfigEntity):
+    # a reading like the eco statistics, not a setting
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
     @property
     def native_value(self) -> StateType | date | datetime | Decimal:
         return self.vzug_command.get("value")

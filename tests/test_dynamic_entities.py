@@ -81,8 +81,10 @@ async def test_settings_that_appear_later_get_entities():
 
     added.clear()
     shared.config_coord.update(_config(settings=[_SOUND, _LIGHT, _LOCKED]))
-    # 'locked' isn't alterable, so it stays without a switch as before
-    assert added == [[f"{PREFIX}-userconfig-settings-light"]]
+    # locked while a program runs, it still gets its switch
+    assert added == [
+        [f"{PREFIX}-userconfig-settings-light", f"{PREFIX}-userconfig-settings-locked"]
+    ]
 
 
 @pytest.mark.asyncio

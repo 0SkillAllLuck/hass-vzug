@@ -43,7 +43,7 @@ async def async_setup_entry(
     )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
-        if command.get("type") == "range" and command.get("alterable", True):
+        if command.get("type") == "range":
             return UserConfig(shared, category_key=key[0], command_key=key[1])
         return None
 
@@ -220,6 +220,7 @@ class UserConfig(NumberEntity, UserConfigEntity):
             return None
 
     async def async_set_native_value(self, value: float) -> None:
+        self.ensure_alterable()
         async with action_errors(self.shared):
             await self.shared.client.set_command(self.vzug_command_key, str(int(value)))
         await self.coordinator.async_request_refresh()

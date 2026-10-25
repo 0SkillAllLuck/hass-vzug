@@ -5,7 +5,7 @@ import httpx
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import ChildDeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -113,7 +113,9 @@ def user_config_commands(
 
 class UserConfigEntity(CoordinatorEntity[ConfigCoordinator]):
     _attr_has_entity_name = True
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    # fixed, not taken from 'alterable': HA only reads the category when it adds
+    # the entity, so a setting added mid-program would register as diagnostic
+    _attr_entity_category = EntityCategory.CONFIG
     # fixed per entity, no point storing them with every state change
     _unrecorded_attributes = frozenset({"category_key", "command_key"})
 
@@ -148,13 +150,16 @@ class UserConfigEntity(CoordinatorEntity[ConfigCoordinator]):
             name = self.vzug_command_key
         return name
 
-    @property
-    def entity_category(self) -> EntityCategory | None:
-        return (
-            EntityCategory.CONFIG
-            if self.vzug_command.get("alterable", False)
-            else EntityCategory.DIAGNOSTIC
-        )
+    def ensure_alterable(self) -> None:
+        """Refuse a change the appliance doesn't allow right now.
+
+        It locks its settings while a program runs. Older firmware doesn't send
+        'alterable' at all, those settings can always be changed.
+        """
+        if not self.vzug_command.get("alterable", True):
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="setting_locked"
+            )
 
 
 class ZoneEntity(CoordinatorEntity[ZoneCoordinator]):

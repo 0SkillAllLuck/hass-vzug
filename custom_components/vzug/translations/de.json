@@ -208,6 +208,9 @@
     },
     "unknown_update_component": {
       "message": "Das Gerät bietet ein Update für {name} an, das diese Integration nicht installieren kann."
+    },
+    "setting_locked": {
+      "message": "Das Gerät erlaubt gerade nicht, diese Einstellung zu ändern, zum Beispiel während ein Programm läuft."
     }
   }
 }
