@@ -1,12 +1,10 @@
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import api, zones
-from .const import DOMAIN
 from .helpers import (
     UserConfigEntity,
     ZoneEntity,
@@ -15,7 +13,7 @@ from .helpers import (
     snake,
     user_config_commands,
 )
-from .shared import Shared
+from .shared import Shared, VZugConfigEntry
 
 _ICONS = {
     "superCool": "mdi:snowflake-thermometer",
@@ -28,10 +26,10 @@ _ICONS = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: VZugConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    shared: Shared = hass.data[DOMAIN][config_entry.entry_id]
+    shared = config_entry.runtime_data
 
     if shared.zone_coord is not None:
         add_entities_when_ready(

@@ -2,13 +2,12 @@ import dataclasses
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import CONF_BASE_URL, DOMAIN
-from .shared import Shared
+from .const import CONF_BASE_URL
+from .shared import VZugConfigEntry
 
 # the same values 'tests/fixtures/collect_responses.py' de-identifies, plus the
 # ones that carry them along: the unique id and the DHCP discovery key are the MAC,
@@ -50,9 +49,9 @@ def _coordinator(coord: DataUpdateCoordinator[Any] | None) -> dict[str, Any] | N
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: VZugConfigEntry
 ) -> dict[str, Any]:
-    shared: Shared = hass.data[DOMAIN][entry.entry_id]
+    shared = entry.runtime_data
 
     # only what is already in memory: asking the appliance would compete with the
     # coordinators for its single connection

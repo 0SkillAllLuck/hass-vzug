@@ -14,7 +14,7 @@ from homeassistant.config_entries import ConfigEntryState, current_entry
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components.vzug import async_setup_entry, async_unload_entry
-from custom_components.vzug.const import CONF_BASE_URL, DOMAIN
+from custom_components.vzug.const import CONF_BASE_URL
 from custom_components.vzug.shared import UNREACHABLE_RETRY_INTERVAL, Shared
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -111,7 +111,7 @@ class Setup:
 
     @property
     def shared(self) -> Shared:
-        return self.hass.data[DOMAIN]["entry"]
+        return self.entry.runtime_data
 
     def __enter__(self) -> "Setup":
         self.hass.loop = asyncio.get_running_loop()

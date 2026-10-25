@@ -10,7 +10,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -18,7 +17,6 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import api, zones
-from .const import DOMAIN
 from .helpers import (
     UserConfigEntity,
     ZoneEntity,
@@ -27,7 +25,7 @@ from .helpers import (
     snake,
     user_config_commands,
 )
-from .shared import Shared, StateCoordinator
+from .shared import Shared, StateCoordinator, VZugConfigEntry
 
 # https://developers.home-assistant.io/docs/core/entity/sensor/
 
@@ -95,10 +93,10 @@ _ECO_SENSORS: list[SensorEntityDescription] = [
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: VZugConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    shared: Shared = hass.data[DOMAIN][config_entry.entry_id]
+    shared = config_entry.runtime_data
 
     entities: list[SensorEntity] = [
         Program(shared),

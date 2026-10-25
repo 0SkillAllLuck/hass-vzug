@@ -68,10 +68,12 @@ STATE_MAX_STALE_UPDATES = 3
 # they look again every minute instead, so their entities come back along with it.
 UNREACHABLE_RETRY_INTERVAL = timedelta(minutes=1)
 
+type VZugConfigEntry = ConfigEntry[Shared]
+
 
 class Shared:
     hass: HomeAssistant
-    entry: ConfigEntry
+    entry: VZugConfigEntry
     client: api.VZugApi
 
     state_coord: StateCoordinator
@@ -87,7 +89,7 @@ class Shared:
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: ConfigEntry,
+        entry: VZugConfigEntry,
         base_url: yarl.URL,
         credentials: api.Credentials | None,
     ) -> None:
