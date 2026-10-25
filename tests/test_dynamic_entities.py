@@ -78,7 +78,7 @@ _HARDNESS = {"command": "hardness", "type": "status", "value": "7"}
 async def test_settings_that_appear_later_get_entities():
     shared, hass, entry, add, added = _setup(_config(settings=[_SOUND]))
     await switch.async_setup_entry(hass, entry, add)
-    assert added == [[], [f"{PREFIX}-userconfig-settings-sound"]]
+    assert added == [[f"{PREFIX}-userconfig-settings-sound"]]
 
     added.clear()
     shared.config_coord.update(_config(settings=[_SOUND, _LIGHT, _LOCKED]))
@@ -91,12 +91,12 @@ async def test_busy_appliance_at_startup():
     # a busy appliance answers getCategories with an empty list
     shared, hass, entry, add, added = _setup({})
     await switch.async_setup_entry(hass, entry, add)
-    assert added == [[]]
+    assert added == []
 
     shared.config_coord.update(_config(settings=[_SOUND]))
     shared.config_coord.update({})
     shared.config_coord.update(_config(settings=[_SOUND]))
-    assert added == [[], [f"{PREFIX}-userconfig-settings-sound"]]
+    assert added == [[f"{PREFIX}-userconfig-settings-sound"]]
     entry.async_on_unload.assert_called_once()
 
 

@@ -11,6 +11,7 @@ from .const import DOMAIN
 from .helpers import (
     UserConfigEntity,
     add_entities_as_they_appear,
+    add_entities_when_ready,
     user_config_commands,
 )
 from .shared import ProgramCoordinator, Shared, StateCoordinator
@@ -27,10 +28,15 @@ async def async_setup_entry(
     if shared.meta.supports_update_status():
         entities.append(CheckUpdate(shared))
 
-    if shared.program_coord is not None:
-        entities.append(SendProgram(shared))
-
     async_add_entities(entities)
+
+    if shared.program_coord is not None:
+        add_entities_when_ready(
+            config_entry,
+            shared.program_coord,
+            async_add_entities,
+            lambda: [SendProgram(shared)],
+        )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
         if command.get("type") == "action":

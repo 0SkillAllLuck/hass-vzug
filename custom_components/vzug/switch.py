@@ -11,6 +11,7 @@ from .helpers import (
     UserConfigEntity,
     ZoneEntity,
     add_entities_as_they_appear,
+    add_entities_when_ready,
     snake,
     user_config_commands,
 )
@@ -32,7 +33,13 @@ async def async_setup_entry(
 ) -> None:
     shared: Shared = hass.data[DOMAIN][config_entry.entry_id]
 
-    async_add_entities(_zone_entities(shared))
+    if shared.zone_coord is not None:
+        add_entities_when_ready(
+            config_entry,
+            shared.zone_coord,
+            async_add_entities,
+            lambda: _zone_entities(shared),
+        )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
         if command.get("type") == "boolean" and command.get("alterable", True):

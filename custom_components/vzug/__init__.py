@@ -40,6 +40,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = shared
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_create_background_task(
+        hass, shared.async_refresh_the_rest(), f"{DOMAIN} first refresh"
+    )
 
     return True
 

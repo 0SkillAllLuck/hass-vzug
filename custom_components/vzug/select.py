@@ -9,6 +9,7 @@ from .const import DOMAIN
 from .helpers import (
     UserConfigEntity,
     add_entities_as_they_appear,
+    add_entities_when_ready,
     user_config_commands,
 )
 from .shared import ProgramCoordinator, Shared
@@ -21,11 +22,13 @@ async def async_setup_entry(
 ) -> None:
     shared: Shared = hass.data[DOMAIN][config_entry.entry_id]
 
-    entities: list[SelectEntity] = []
     if shared.program_coord is not None:
-        entities.append(ProgramSelect(shared))
-
-    async_add_entities(entities)
+        add_entities_when_ready(
+            config_entry,
+            shared.program_coord,
+            async_add_entities,
+            lambda: [ProgramSelect(shared)],
+        )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
         if command.get("type") == "selection" and command.get("alterable", True):

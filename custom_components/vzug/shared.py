@@ -153,8 +153,6 @@ class Shared:
             ) from exc
 
         await self.state_coord.async_config_entry_first_refresh()
-        await self.update_coord.async_config_entry_first_refresh()
-        await self.config_coord.async_config_entry_first_refresh()
         await self._setup_zones()
 
         try:
@@ -162,6 +160,21 @@ class Shared:
         except Exception as exc:
             _LOGGER.exception("init failed")
             raise ConfigEntryNotReady() from exc
+
+    async def async_refresh_the_rest(self) -> None:
+        """The first refresh of everything the setup doesn't wait for.
+
+        Over the appliance's single connection this takes several seconds, and Home
+        Assistant only reports itself as started once every setup is done. The
+        entities are added as their data arrives. A refresh that fails here is
+        retried by the coordinator's polling, which their listeners keep going.
+        """
+        await self.update_coord.async_refresh()
+        if self.zone_coord is not None:
+            await self._refresh_zones()
+        await self.config_coord.async_refresh()
+        if self.program_coord is not None:
+            await self._setup_programs()
 
     async def async_shutdown(self) -> None:
         await self.state_coord.async_shutdown()
@@ -173,10 +186,12 @@ class Shared:
             await self.program_coord.async_shutdown()
 
     async def _setup_zones(self) -> None:
-        """Find out whether this appliance has zones, and which modes it knows.
+        """Find out whether this appliance has zones.
 
-        Dishwashers and washing machines answer 'getProgram' with a single entry
-        without a zone, they get no zone coordinator at all.
+        The platforms need to know which coordinator to listen to, everything else
+        is left to 'async_refresh_the_rest'. Dishwashers and washing machines answer
+        'getProgram' with a single entry without a zone, they get a program
+        coordinator instead. It stays idle until '_setup_programs' finds names.
         """
         try:
             raw_programs = await self.client.get_raw_programs(attempts=2)
@@ -184,9 +199,25 @@ class Shared:
             _LOGGER.debug("'getProgram' failed, assuming no zones: %r", exc)
             return
         if not zones.has_zones(raw_programs):
-            await self._setup_programs()
+            self.program_coord = DataUpdateCoordinator(
+                self.hass,
+                _LOGGER,
+                name="programs",
+                update_method=self._fetch_programs,
+            )
             return
 
+        self.zone_coord = DataUpdateCoordinator(
+            self.hass,
+            _LOGGER,
+            name="zones",
+            update_interval=ZONE_COORD_INTERVAL,
+            update_method=self._fetch_zones,
+        )
+
+    async def _refresh_zones(self) -> None:
+        """Learn which modes the appliance knows, then fetch the zones."""
+        assert self.zone_coord is not None
         supported: list[str] = []
         for mode in zones.ALL_MODES:
             try:
@@ -196,18 +227,11 @@ class Shared:
             else:
                 supported.append(mode)
         self._zone_modes = tuple(supported)
-
-        self.zone_coord = DataUpdateCoordinator(
-            self.hass,
-            _LOGGER,
-            name="zones",
-            update_interval=ZONE_COORD_INTERVAL,
-            update_method=self._fetch_zones,
-        )
-        await self.zone_coord.async_config_entry_first_refresh()
+        await self.zone_coord.async_refresh()
 
     async def _setup_programs(self) -> None:
         """Learn the names of the programs this appliance offers (dishwashers)."""
+        assert self.program_coord is not None
         try:
             program_ids = await self.client.get_all_program_ids()
         except Exception as exc:
@@ -227,14 +251,8 @@ class Shared:
             return
 
         self._program_names = names
-        self.program_coord = DataUpdateCoordinator(
-            self.hass,
-            _LOGGER,
-            name="programs",
-            update_interval=PROGRAM_COORD_INTERVAL,
-            update_method=self._fetch_programs,
-        )
-        await self.program_coord.async_config_entry_first_refresh()
+        self.program_coord.update_interval = PROGRAM_COORD_INTERVAL
+        await self.program_coord.async_refresh()
 
     async def _fetch_programs(self) -> zones.ProgramState:
         previous = self.program_coord.data if self.program_coord else None
@@ -299,8 +317,8 @@ class Shared:
                 configuration_url=str(self.client.base_url),
                 identifiers={(DOMAIN, self.meta.serial_number)},
                 name=self.meta.create_name(),
-                hw_version=self.update_coord.data.ai_fw_version.get("HW"),
-                sw_version=self.update_coord.data.ai_fw_version.get("SW"),
+                hw_version=self.meta.ai_fw_version.get("HW"),
+                sw_version=self.meta.ai_fw_version.get("SW"),
                 connections={(dr.CONNECTION_NETWORK_MAC, mac_addr)},
                 model=self.meta.model_name,
             )
@@ -529,6 +547,9 @@ class Shared:
         except Exception as exc:
             # 'previous is None' means we never had a successful update, so there is
             # nothing to keep and the caller should see the failure
+            if previous is None:
+                # its entities only appear with the first tree, don't wait an hour
+                self.config_coord.update_interval = UNREACHABLE_RETRY_INTERVAL
             if previous is None or self._config_stale_count >= CONFIG_MAX_STALE_UPDATES:
                 raise UpdateFailed(f"config update failed: {exc!r}") from exc
             self._config_stale_count += 1

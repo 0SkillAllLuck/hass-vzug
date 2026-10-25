@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import zones
 from .const import DOMAIN
-from .helpers import ZoneEntity, zone_translation
+from .helpers import ZoneEntity, add_entities_when_ready, zone_translation
 from .shared import Shared
 
 
@@ -18,13 +18,19 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     shared: Shared = hass.data[DOMAIN][config_entry.entry_id]
-    if shared.zone_coord is None:
+    zone_coord = shared.zone_coord
+    if zone_coord is None:
         return
 
-    async_add_entities(
-        Door(shared, zone=name)
-        for name, zone in shared.zone_coord.data.zones.items()
-        if isinstance(zone.get(zones.DOOR_KEY), bool)
+    add_entities_when_ready(
+        config_entry,
+        zone_coord,
+        async_add_entities,
+        lambda: [
+            Door(shared, zone=name)
+            for name, zone in zone_coord.data.zones.items()
+            if isinstance(zone.get(zones.DOOR_KEY), bool)
+        ],
     )
 
 

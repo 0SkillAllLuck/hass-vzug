@@ -13,7 +13,7 @@ from custom_components.vzug.number import BoostDuration, Timer, ZoneTemperature
 from custom_components.vzug.number import _zone_entities as number_entities
 from custom_components.vzug.sensor import ModeSensor, TimeLeft
 from custom_components.vzug.sensor import _zone_entities as sensor_entities
-from custom_components.vzug.shared import Shared
+from custom_components.vzug.shared import PROGRAM_COORD_INTERVAL, Shared
 from custom_components.vzug.switch import Mode, TimedFunction
 from custom_components.vzug.switch import _zone_entities as switch_entities
 
@@ -193,13 +193,18 @@ async def test_setup_zones_probes_the_modes(bare_shared, monkeypatch):
         return MODES[name]
 
     bare_shared.client.get_cmd_value = get_cmd_value
-    coordinator = MagicMock(async_config_entry_first_refresh=AsyncMock())
+    coordinator = MagicMock(async_refresh=AsyncMock())
     monkeypatch.setattr(
         "custom_components.vzug.shared.DataUpdateCoordinator",
         MagicMock(return_value=coordinator),
     )
     await bare_shared._setup_zones()
     assert bare_shared.zone_coord is coordinator
+    # the modes are probed after the setup
+    assert bare_shared._zone_modes == ()
+
+    await bare_shared._refresh_zones()
+    coordinator.async_refresh.assert_awaited_once()
     assert bare_shared._zone_modes == (
         "HolidayMode",
         "SilentPlusMode",
@@ -264,17 +269,24 @@ async def test_setup_programs_learns_the_names(bare_shared, monkeypatch):
     bare_shared.client.get_program_details = AsyncMock(
         side_effect=lambda pid: {"id": pid, "name": DISHWASHER_NAMES[pid]}
     )
-    coordinator = MagicMock(async_config_entry_first_refresh=AsyncMock(), data=None)
+    coordinator = MagicMock(async_refresh=AsyncMock(), data=None)
+    constructor = MagicMock(return_value=coordinator)
     monkeypatch.setattr(
-        "custom_components.vzug.shared.DataUpdateCoordinator",
-        MagicMock(return_value=coordinator),
+        "custom_components.vzug.shared.DataUpdateCoordinator", constructor
     )
 
     await bare_shared._setup_zones()
 
     assert bare_shared.zone_coord is None
     assert bare_shared.program_coord is coordinator
+    # idle until the names are known, after the setup
+    assert constructor.call_args.kwargs.get("update_interval") is None
+    bare_shared.client.get_all_program_ids.assert_not_awaited()
+
+    await bare_shared._setup_programs()
     assert bare_shared._program_names == DISHWASHER_NAMES
+    assert coordinator.update_interval == PROGRAM_COORD_INTERVAL
+    coordinator.async_refresh.assert_awaited_once()
 
     bare_shared.client.get_raw_programs = AsyncMock(
         return_value=[{"id": 50, "name": "Eco", "status": "selected"}]
@@ -291,6 +303,22 @@ async def test_setup_programs_learns_the_names(bare_shared, monkeypatch):
     )
     with pytest.raises(UpdateFailed):
         await bare_shared._fetch_programs()
+
+
+@pytest.mark.asyncio
+async def test_programs_without_names_stay_idle(bare_shared):
+    """Nothing to select: no polling for a select that never appears."""
+    bare_shared._program_names = {}
+    bare_shared.program_coord = MagicMock(
+        async_refresh=AsyncMock(), update_interval=None
+    )
+    bare_shared.client.get_all_program_ids = AsyncMock(return_value=[3000, 3001])
+    bare_shared.client.get_program_details = AsyncMock(return_value={"id": 3000})
+
+    await bare_shared._setup_programs()
+
+    assert bare_shared.program_coord.update_interval is None
+    bare_shared.program_coord.async_refresh.assert_not_awaited()
 
 
 @pytest.mark.asyncio
