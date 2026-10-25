@@ -192,6 +192,38 @@ async def test_setup_only_waits_for_meta_and_state(device):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
+    ("device", "model_id", "serial_number"),
+    [
+        (DISHWASHER, "AS6TDI", "46126 182263"),
+        (WASHER, "AW6T", "33147 536171"),
+        (OVEN, "CSB", "40695 200742"),
+        # no 'getDeviceInfo', the AI module has no model id
+        ("adora_slq", None, "33493 832315"),
+        ("adora_tslq_wp", None, "61358 902645"),
+    ],
+)
+async def test_device_info(device, model_id, serial_number):
+    with Setup(device) as setup:
+        await setup.setup()
+        info = setup.shared.device_info
+
+        assert info["manufacturer"] == "V-ZUG"
+        assert info.get("model_id") == model_id
+        assert info.get("serial_number") == serial_number
+
+
+@pytest.mark.asyncio
+async def test_device_info_leaves_out_an_empty_serial_number():
+    with Setup(DISHWASHER) as setup:
+        await setup.setup()
+        setup.shared.meta.serial_number = ""
+        await setup.shared._post_first_refresh()
+
+        assert setup.shared.device_info.get("serial_number") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
     ("device", "coordinators"),
     [
         (DISHWASHER, {"state", "update", "config", "programs"}),
