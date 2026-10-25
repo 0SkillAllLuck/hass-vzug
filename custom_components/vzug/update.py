@@ -39,6 +39,13 @@ class VZugUpdate(UpdateEntity, CoordinatorEntity[UpdateCoordinator]):
     _attr_translation_key = "update"
     _attr_has_entity_name = True
     _attr_device_class = UpdateDeviceClass.FIRMWARE
+    # static firmware details, 'installed_version' already records the version.
+    # Not MATCH_ALL, that would also drop the update attributes from the history.
+    # ponytail: keys missing from the TypedDicts are still recorded, add them there
+    _unrecorded_attributes = frozenset(
+        {f"ai_{k}" for k in api.AiFwVersion.__annotations__}
+        | {f"hh_{k}" for k in api.HhFwVersion.__annotations__}
+    )
     _attr_auto_update = False
     _attr_supported_features = (
         UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS

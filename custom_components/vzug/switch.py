@@ -82,6 +82,9 @@ class TimedFunction(ZoneEntity, SwitchEntity):
     switches it off by itself when that is over.
     """
 
+    # changes with every zone poll while running, the time left sensor has it too
+    _unrecorded_attributes = frozenset({"remaining_seconds"})
+
     def __init__(self, shared: Shared, *, zone: str, key: str) -> None:
         super().__init__(shared, zone=zone, key=key)
         self._attr_translation_key = snake(key)

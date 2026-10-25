@@ -113,6 +113,8 @@ def user_config_commands(
 class UserConfigEntity(CoordinatorEntity[ConfigCoordinator]):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    # fixed per entity, no point storing them with every state change
+    _unrecorded_attributes = frozenset({"category_key", "command_key"})
 
     def __init__(self, shared: Shared, *, category_key: str, command_key: str) -> None:
         super().__init__(shared.config_coord)
