@@ -40,7 +40,8 @@ async def action_errors(shared: Shared) -> AsyncIterator[None]:
             translation_domain=DOMAIN, translation_key="no_answer"
         ) from err
     except (httpx.HTTPError, AssertionError, ValueError) as err:
-        # it answered, but refused the request or sent something unusable
+        # it is there, but refused the request, sent something unusable or was too
+        # slow to answer, ex. while waking up
         raise HomeAssistantError(
             translation_domain=DOMAIN, translation_key="request_failed"
         ) from err

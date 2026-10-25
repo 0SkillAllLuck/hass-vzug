@@ -128,7 +128,7 @@ Replace the entity IDs with your appliances' Program event entities, and `notify
 
 ## Troubleshooting
 
-- **Unavailable**: the appliance doesn't answer. Check that it is switched on and connected to the network. The integration logs this once, and the entities come back when the appliance answers again. Pressing **Refresh Now** brings them back sooner.
+- **Unavailable**: the appliance can't be reached. Check that it is switched on and connected to the network. The integration logs this once, and the entities come back when the appliance answers again. Pressing **Refresh Now** brings them back sooner. An appliance that is only slow to answer, for example while it wakes up from standby, stays available.
 - **Out of date**: press **Refresh Now**.
 - **Diagnostics**: open the integration under **Settings** > **Devices & services**, and select **Download diagnostics** in the entry's menu. The file contains what the integration already has in memory, so downloading it doesn't contact the appliance. Credentials, the address, MAC address, serial numbers and device names are redacted.
 - **Debug logs**: on the integration page, select **Enable debug logging**, reproduce the problem, then disable it again to download the log. Or in `configuration.yaml`:

@@ -21,9 +21,9 @@ _LOGGER = logging.getLogger(__name__)
 # error is not enough to write the command off.
 ZH_MODE_WARMUP_MAX_FAILURES = 3
 
-# nothing answered in time: the appliance is switched off or out of reach. A busy
-# one answers quickly with 503, 400.03 or '200 []' instead.
-NO_ANSWER = (httpx.ConnectError, httpx.TimeoutException)
+# no connection could be made: the appliance is switched off or out of reach. One
+# that took the connection is there, even if it is slow to answer (see '_command').
+NO_ANSWER = (httpx.ConnectError, httpx.ConnectTimeout)
 
 DeviceStatusInactiveT = Literal["true"] | Literal["false"]
 
@@ -389,6 +389,7 @@ class VZugApi:
 
         last_exc = ValueError("no attempts made")
         attempt_idx = 0
+        timed_out = False
         while attempt_idx < attempts:
             # starts with 0s, then retry_delay
             await asyncio.sleep(attempt_idx * retry_delay)
@@ -420,6 +421,18 @@ class VZugApi:
                 # appliance is gone, so it can make its entities unavailable.
                 _LOGGER.debug("no answer, not retrying: %r", err)
                 raise
+            except httpx.TimeoutException as err:
+                # it took the request, but a sleeping appliance can take longer than
+                # the read timeout to wake up for it, and then answers right away.
+                # So one more try, whatever 'attempts' says, and no more: httpx drops
+                # the connection, so the retry also notices an appliance that has
+                # been switched off since.
+                last_exc = err
+                _LOGGER.debug("timeout: %r", err)
+                if timed_out:
+                    break
+                timed_out = True
+                attempts = max(attempts, attempt_idx + 2)
             except httpx.TransportError as err:
                 last_exc = err
                 _LOGGER.debug("transport error: %r", err)
@@ -433,7 +446,8 @@ class VZugApi:
             attempt_idx += 1
 
         if value_on_err:
-            # the appliance is there, it just didn't like this one command
+            # the appliance is there, it just didn't like this one command, or was
+            # too slow for it
             _LOGGER.debug("%s failed, using default: %r", command, last_exc)
             return value_on_err()
 
@@ -470,6 +484,10 @@ class VZugApi:
                 # says nothing about the command, and the rest of the poll would
                 # only wait for the same appliance
                 raise
+            except httpx.TimeoutException as exc:
+                # says nothing about the command either, a sleeping appliance is
+                # slow to wake up. It is awake for the rest of the poll now.
+                _LOGGER.debug("zh_mode warm-up timed out: %r", exc)
             except Exception as exc:
                 self._zh_mode_warmup_failures += 1
                 _LOGGER.debug(

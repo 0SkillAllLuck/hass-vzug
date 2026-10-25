@@ -381,7 +381,7 @@
             "message": "The appliance didn't answer. Check that it is switched on and connected to the network."
         },
         "request_failed": {
-            "message": "The appliance refused the request or answered with something unexpected. It may be busy, try again in a moment."
+            "message": "The appliance refused the request, answered with something unexpected or took too long to answer. It may be busy, try again in a moment."
         },
         "no_program_selected": {
             "message": "Select a program first."

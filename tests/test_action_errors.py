@@ -49,7 +49,7 @@ def _program_shared(current=None):
     ("error", "key"),
     [
         (httpx.ConnectError("unreachable", request=_REQUEST), "no_answer"),
-        (httpx.ReadTimeout("too slow", request=_REQUEST), "no_answer"),
+        (httpx.ReadTimeout("too slow", request=_REQUEST), "request_failed"),
         (_status_error(400), "request_failed"),
         (_status_error(503), "request_failed"),
         (httpx.RemoteProtocolError("dropped", request=_REQUEST), "request_failed"),
