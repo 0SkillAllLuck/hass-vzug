@@ -1,55 +1,52 @@
-import asyncio
-from collections.abc import Awaitable
+import dataclasses
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN
+from .const import CONF_BASE_URL, DOMAIN
 from .shared import Shared
 
-TO_REDACT: set[str] = {CONF_PASSWORD, CONF_USERNAME}
+# the same values 'tests/fixtures/collect_responses.py' de-identifies, plus the
+# ones that carry them along: the unique id and the DHCP discovery key are the MAC,
+# the title and the device name usually contain the serial number
+TO_REDACT: set[str] = {
+    CONF_PASSWORD,
+    CONF_USERNAME,
+    CONF_BASE_URL,
+    "unique_id",
+    "discovery_keys",
+    "title",
+    "mac_address",
+    "serial_number",
+    "device_name",
+    "DeviceName",
+    "Serial",
+    "serialNumber",
+    "deviceUuid",
+    "fn",
+    "an",
+}
 
 
-def _serialize_exception(exc: Exception) -> dict[str, Any]:
+def _coordinator(coord: DataUpdateCoordinator[Any] | None) -> dict[str, Any] | None:
+    if coord is None:
+        return None
+    data = coord.data
+    if isinstance(data, dict):
+        # the config tree
+        data = {key: dataclasses.asdict(category) for key, category in data.items()}
+    elif data is not None:
+        data = dataclasses.asdict(data)
+    interval = coord.update_interval
     return {
-        "type": type(exc).__qualname__,
-        "message": str(exc),
-        "args": exc.args,
+        "last_update_success": coord.last_update_success,
+        "update_interval": interval.total_seconds() if interval else None,
+        "data": data,
     }
-
-
-async def gather_full_api_sample(shared: Shared) -> dict[str, Any]:
-    data: dict[str, Any] = {}
-
-    async def do_one(key: str, pending: Awaitable[Any]) -> None:
-        try:
-            data[key] = await pending
-        except Exception as exc:
-            data[key] = _serialize_exception(exc)
-
-    await asyncio.gather(
-        do_one("mac_address", shared.client.get_mac_address()),
-        do_one("model_description", shared.client.get_model_description()),
-        do_one("device_status", shared.client.get_device_status()),
-        do_one("update_status", shared.client.get_update_status()),
-        do_one("check_for_updates", shared.client.check_for_updates()),
-        do_one("last_push_notifications", shared.client.get_last_push_notifications()),
-        do_one("list_categories", shared.client.list_categories()),
-        do_one("hh_fw_version", shared.client.get_hh_fw_version()),
-        do_one("ai_fw_version", shared.client.get_ai_fw_version()),
-        do_one("zh_mode", shared.client.get_zh_mode()),
-        do_one("eco_info", shared.client.get_eco_info()),
-        do_one("device_info", shared.client.get_device_info()),
-        do_one("program", shared.client.get_program()),
-        do_one("all_program_ids", shared.client.get_all_program_ids()),
-        # config aggregate
-        do_one("aggregate_config", shared.client.aggregate_config()),
-    )
-
-    return data
 
 
 async def async_get_config_entry_diagnostics(
@@ -57,9 +54,17 @@ async def async_get_config_entry_diagnostics(
 ) -> dict[str, Any]:
     shared: Shared = hass.data[DOMAIN][entry.entry_id]
 
-    api_sample = await gather_full_api_sample(shared)
-
-    return {
-        "entry": async_redact_data(entry.as_dict(), TO_REDACT),
-        "api_sample": api_sample,
-    }
+    # only what is already in memory: asking the appliance would compete with the
+    # coordinators for its single connection
+    return async_redact_data(
+        {
+            "entry": entry.as_dict(),
+            "meta": dataclasses.asdict(shared.meta),
+            "state": _coordinator(shared.state_coord),
+            "update": _coordinator(shared.update_coord),
+            "config": _coordinator(shared.config_coord),
+            "zones": _coordinator(shared.zone_coord),
+            "programs": _coordinator(shared.program_coord),
+        },
+        TO_REDACT,
+    )
