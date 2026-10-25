@@ -238,6 +238,8 @@ class Program(StateBase):
 class ProgramEndRaw(StateBase):
     _attr_translation_key = "program_end_raw"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    # the appliance's text for 'program_end', which shows it as a timestamp
+    _attr_entity_registry_enabled_default = False
 
     @property
     def vzug_program_end(self) -> api.DeviceStatusProgramEnd:
@@ -261,6 +263,7 @@ _RE_END_DURATON = re.compile(r"(?P<hours>\d+)[h](?P<minutes>\d+)", re.IGNORECASE
 class ProgramEnd(ProgramEndRaw):
     _attr_translation_key = "program_end"
     _attr_entity_category = None
+    _attr_entity_registry_enabled_default = True
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(self, shared: Shared) -> None:
