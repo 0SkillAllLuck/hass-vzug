@@ -44,6 +44,10 @@
         "data": {
           "username": "Nutzername",
           "password": "Passwort"
+        },
+        "data_description": {
+          "username": "Der Nutzername für die Anmeldung am Gerät",
+          "password": "Das Passwort für die Anmeldung am Gerät"
         }
       },
       "confirm": {

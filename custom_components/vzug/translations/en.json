@@ -44,6 +44,10 @@
                 "data": {
                     "username": "Username",
                     "password": "Password"
+                },
+                "data_description": {
+                    "username": "The username to log in to the appliance",
+                    "password": "The password to log in to the appliance"
                 }
             },
             "confirm": {
