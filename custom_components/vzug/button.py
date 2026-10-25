@@ -1,13 +1,15 @@
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import api, zones
+from .const import DOMAIN
 from .helpers import (
     UserConfigEntity,
+    action_errors,
     add_entities_as_they_appear,
     add_entities_when_ready,
     user_config_commands,
@@ -76,10 +78,13 @@ class SendProgram(CoordinatorEntity[ProgramCoordinator], ButtonEntity):
         await self.coordinator.async_refresh()
         current = self.coordinator.data.current
         if current is None or not isinstance(current.get("id"), int):
-            raise HomeAssistantError("Select a program first")
-        await self.shared.client.set_program(
-            current["id"], zones.program_options(current)
-        )
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="no_program_selected"
+            )
+        async with action_errors(self.shared):
+            await self.shared.client.set_program(
+                current["id"], zones.program_options(current)
+            )
         await self.coordinator.async_request_refresh()
 
 
@@ -132,10 +137,12 @@ class CheckUpdate(CoordinatorEntity[StateCoordinator], ButtonEntity):
         self._attr_device_info = shared.device_info
 
     async def async_press(self) -> None:
-        await self.shared.client.check_for_updates()
+        async with action_errors(self.shared):
+            await self.shared.client.check_for_updates()
         await self.shared.update_coord.async_request_refresh()
 
 
 class UserConfig(ButtonEntity, UserConfigEntity):
     async def async_press(self) -> None:
-        await self.shared.client.do_command_action(self.vzug_command_key)
+        async with action_errors(self.shared):
+            await self.shared.client.do_command_action(self.vzug_command_key)

@@ -171,5 +171,25 @@
         }
       }
     }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "Das Gerät hat die Anmeldedaten abgelehnt. Bitte gib sie erneut ein."
+    },
+    "no_answer": {
+      "message": "Das Gerät antwortet nicht. Prüfe, ob es eingeschaltet und mit dem Netzwerk verbunden ist."
+    },
+    "request_failed": {
+      "message": "Das Gerät hat die Anfrage abgelehnt oder unerwartet geantwortet. Vielleicht ist es gerade beschäftigt, versuch es gleich nochmal."
+    },
+    "no_program_selected": {
+      "message": "Wähle zuerst ein Programm aus."
+    },
+    "unknown_program": {
+      "message": "Unbekanntes Programm: {option}"
+    },
+    "unknown_update_component": {
+      "message": "Das Gerät bietet ein Update für {name} an, das diese Integration nicht installieren kann."
+    }
   }
 }

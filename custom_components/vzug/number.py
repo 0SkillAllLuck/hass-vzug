@@ -12,6 +12,7 @@ from . import api, zones
 from .helpers import (
     UserConfigEntity,
     ZoneEntity,
+    action_errors,
     add_entities_as_they_appear,
     add_entities_when_ready,
     snake,
@@ -223,5 +224,6 @@ class UserConfig(NumberEntity, UserConfigEntity):
             return None
 
     async def async_set_native_value(self, value: float) -> None:
-        await self.shared.client.set_command(self.vzug_command_key, str(int(value)))
+        async with action_errors(self.shared):
+            await self.shared.client.set_command(self.vzug_command_key, str(int(value)))
         await self.coordinator.async_request_refresh()
