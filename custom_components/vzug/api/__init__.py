@@ -231,6 +231,8 @@ class AggMeta:
     serial_number: str
     api_version: tuple[int, ...]
     ai_fw_version: AiFwVersion = dataclasses.field(default_factory=AiFwVersion)
+    # the 'getDeviceStatus' answer and when it came, for the state's first refresh
+    device_status: tuple[DeviceStatus, datetime] | None = None
 
     def create_name(self) -> str:
         if name := self.device_name.strip():
@@ -443,13 +445,15 @@ class VZugApi:
         default_on_error: bool = True,
         include_device: bool = True,
         include_eco: bool = True,
+        device_status: tuple[DeviceStatus, datetime] | None = None,
     ) -> AggState:
         """Fetch the appliance state.
 
         'getDeviceStatus' wakes the appliance up, 'getLastPUSHNotifications' is
         answered by the AI module without touching it. Skipping the former lets the
         caller keep an eye on the appliance without disturbing it; the skipped
-        values come back empty and are the caller's to carry over.
+        values come back empty and are the caller's to carry over. A caller that has
+        just fetched it can pass it in as 'device_status', with its fetch time.
         """
         zh_mode = -1
         # the warm-up only exists to keep 'getEcoInfo' from returning zeros, so
@@ -480,6 +484,8 @@ class VZugApi:
         async def _device() -> tuple[DeviceStatus, datetime]:
             if not include_device:
                 return DeviceStatus(), datetime.now(UTC)
+            if device_status is not None:
+                return device_status
             data = await self.get_device_status(default_on_error=default_on_error)
             return data, datetime.now(UTC)
 
@@ -503,16 +509,27 @@ class VZugApi:
         )
 
     async def aggregate_update_status(
-        self, *, supports_update_status: bool, default_on_error: bool = True
+        self,
+        *,
+        supports_update_status: bool,
+        default_on_error: bool = True,
+        ai_fw_version: AiFwVersion | None = None,
     ) -> AggUpdateStatus:
+        """'ai_fw_version' is used instead of asking, when the caller has it."""
+
         async def _update() -> UpdateStatus:
             if supports_update_status:
                 return await self.get_update_status(default_on_error=default_on_error)
             return UpdateStatus()
 
+        async def _ai_fw_version() -> AiFwVersion:
+            if ai_fw_version is not None:
+                return ai_fw_version
+            return await self.get_ai_fw_version(default_on_error=default_on_error)
+
         update, ai_fw_version, hh_fw_version = await asyncio.gather(
             _update(),
-            self.get_ai_fw_version(default_on_error=default_on_error),
+            _ai_fw_version(),
             self.get_hh_fw_version(default_on_error=default_on_error),
         )
         return AggUpdateStatus(
@@ -525,17 +542,21 @@ class VZugApi:
         self, *, default_on_error: bool = False, attempts: int = 5
     ) -> AggMeta:
         # First method used in config flow to get details about the device
+        async def _device() -> tuple[DeviceStatus, datetime]:
+            data = await self.get_device_status(
+                default_on_error=default_on_error, attempts=attempts
+            )
+            return data, datetime.now(UTC)
+
         (
             mac_address,
-            device_status,
+            (device_status, device_fetched_at),
             model_description,
             ai_firmware,
         ) = await asyncio.gather(
             # This is all from the AI Module/API
             self.get_mac_address(default_on_error=default_on_error, attempts=attempts),
-            self.get_device_status(
-                default_on_error=default_on_error, attempts=attempts
-            ),
+            _device(),
             self.get_model_description(
                 default_on_error=default_on_error, attempts=attempts
             ),
@@ -568,6 +589,7 @@ class VZugApi:
                 serial_number=device_info.get("serialNumber", ""),
                 api_version=hh_api_version,
                 ai_fw_version=ai_firmware,
+                device_status=(device_status, device_fetched_at),
             )
         else:
             raw_api_version = ai_firmware.get("apiVersion", "")
@@ -581,6 +603,7 @@ class VZugApi:
                 serial_number=device_status.get("Serial", ""),
                 api_version=ai_api_version,
                 ai_fw_version=ai_firmware,
+                device_status=(device_status, device_fetched_at),
             )
 
     async def aggregate_config(self) -> AggConfig:
