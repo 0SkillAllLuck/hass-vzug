@@ -89,7 +89,7 @@ Which entities you get depends on what the appliance reports.
   - SuperCool or SuperFreeze, with its duration and the time left
 
   The appliance itself gets PartyCooling (with duration and time left), Holiday mode, SilentPlus, a read-only Sabbath mode sensor, and the kitchen timer.
-- **Programs**: on appliances that list their programs (for example dishwashers), a select picks the program, and the **Send to appliance** button transfers it with its options. The appliance starts it once its door is closed.
+- **Programs**: on appliances that list their programs (for example dishwashers and some ovens), a select picks the program, and the **Send to appliance** button transfers it with its options. The appliance starts it once its door is closed.
 - **Firmware**: an update entity that installs new firmware and shows its progress, and a **Check for Updates** button. Only on appliances whose firmware supports it.
 - **Program events**: the Program event entity fires `program_started` and `program_finished`. Its `program` attribute holds the program's name.
 - **Diagnostics**: see [Troubleshooting](#troubleshooting).
