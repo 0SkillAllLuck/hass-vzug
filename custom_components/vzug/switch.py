@@ -26,13 +26,12 @@ async def async_setup_entry(
 ) -> None:
     shared = config_entry.runtime_data
 
-    if shared.zone_coord is not None:
-        add_entities_when_ready(
-            config_entry,
-            shared.zone_coord,
-            async_add_entities,
-            lambda: _zone_entities(shared),
-        )
+    add_entities_when_ready(
+        config_entry,
+        shared.zone_coord,
+        async_add_entities,
+        lambda: _zone_entities(shared),
+    )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
         if command.get("type") == "boolean" and command.get("alterable", True):
@@ -49,8 +48,6 @@ async def async_setup_entry(
 
 
 def _zone_entities(shared: Shared) -> list[SwitchEntity]:
-    if shared.zone_coord is None:
-        return []
     data = shared.zone_coord.data
     entities: list[SwitchEntity] = []
     for key in zones.BOOST_KEYS:

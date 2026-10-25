@@ -167,7 +167,6 @@ class ZoneEntity(CoordinatorEntity[ZoneCoordinator]):
     _attr_has_entity_name = True
 
     def __init__(self, shared: Shared, *, zone: str, key: str) -> None:
-        assert shared.zone_coord is not None
         super().__init__(shared.zone_coord)
         self.shared = shared
         self.vzug_zone = zone

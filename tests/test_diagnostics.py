@@ -79,10 +79,10 @@ def setup():
     shared.config_coord = _coord(
         {"CAT": AggCategory(key="CAT", description="Settings", commands={})}
     )
-    # zones still waiting for their first refresh, no program coordinator at all
+    # zones still waiting for their first refresh, programs never needed
     shared.zone_coord = _coord(None, None)
     shared.zone_coord.last_update_success = False
-    shared.program_coord = None
+    shared.program_coord = _coord(None, None)
 
     entry.runtime_data = shared
     return MagicMock(), entry, shared
@@ -104,7 +104,7 @@ async def test_diagnostics_come_from_memory(setup):
         "update_interval": None,
         "data": None,
     }
-    assert diag["programs"] is None
+    assert diag["programs"]["data"] is None
 
 
 @pytest.mark.asyncio

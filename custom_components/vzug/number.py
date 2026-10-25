@@ -35,13 +35,12 @@ async def async_setup_entry(
 ) -> None:
     shared = config_entry.runtime_data
 
-    if shared.zone_coord is not None:
-        add_entities_when_ready(
-            config_entry,
-            shared.zone_coord,
-            async_add_entities,
-            lambda: _zone_entities(shared),
-        )
+    add_entities_when_ready(
+        config_entry,
+        shared.zone_coord,
+        async_add_entities,
+        lambda: _zone_entities(shared),
+    )
 
     def user_config(key: tuple[str, str], command: api.Command) -> UserConfig | None:
         if command.get("type") == "range" and command.get("alterable", True):
@@ -58,8 +57,6 @@ async def async_setup_entry(
 
 
 def _zone_entities(shared: Shared) -> list[NumberEntity]:
-    if shared.zone_coord is None:
-        return []
     zone_map = shared.zone_coord.data.zones
     entities: list[NumberEntity] = [
         ZoneTemperature(shared, zone=zone)
