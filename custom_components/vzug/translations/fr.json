@@ -73,6 +73,12 @@
             },
             "send_program": {
                 "name": "Envoyer à l'appareil"
+            },
+            "reset_total_consumption": {
+                "name": "Réinitialiser la consommation totale"
+            },
+            "reset_average_per_cycle": {
+                "name": "Réinitialiser la moyenne par cycle"
             }
         },
         "event": {
@@ -141,6 +147,30 @@
                     "on": "Activé",
                     "off": "Désactivé"
                 }
+            },
+            "last_program_energy": {
+                "name": "Consommation d'énergie du dernier programme"
+            },
+            "last_program_water": {
+                "name": "Consommation d'eau du dernier programme"
+            },
+            "average_energy": {
+                "name": "Consommation d'énergie moyenne"
+            },
+            "average_water": {
+                "name": "Consommation d'eau moyenne"
+            },
+            "total_energy": {
+                "name": "Consommation d'énergie totale"
+            },
+            "total_water": {
+                "name": "Consommation d'eau totale"
+            },
+            "total_consumption": {
+                "name": "Consommation totale"
+            },
+            "average_per_cycle": {
+                "name": "Moyenne par cycle"
             }
         },
         "update": {
@@ -168,6 +198,15 @@
             },
             "timer": {
                 "name": "Minuterie"
+            },
+            "delayed_start": {
+                "name": "Départ différé"
+            },
+            "brightness": {
+                "name": "Luminosité"
+            },
+            "dryness_level": {
+                "name": "Degré de séchage"
             }
         },
         "switch": {
@@ -185,6 +224,69 @@
             },
             "silent_plus_mode": {
                 "name": "SilentPlus"
+            },
+            "energy_saving": {
+                "name": "Économie d'énergie"
+            },
+            "partial_load": {
+                "name": "Charge partielle"
+            },
+            "rinse_plus": {
+                "name": "RinsePlus"
+            },
+            "dry_plus": {
+                "name": "DryPlus"
+            },
+            "steam_finish": {
+                "name": "SteamFinish"
+            },
+            "opti_start": {
+                "name": "OptiStart"
+            },
+            "all_in_one": {
+                "name": "Tout en 1"
+            },
+            "child_lock": {
+                "name": "Sécurité enfants"
+            },
+            "auto_door_opener": {
+                "name": "Ouverture automatique de la porte"
+            },
+            "door_angle_control": {
+                "name": "Commande avec la porte ouverte à 46-90°"
+            },
+            "auto_standby": {
+                "name": "Veille automatique"
+            },
+            "empty_tank_on_power_failure": {
+                "name": "Vider le réservoir en cas de coupure de courant"
+            },
+            "eco_management": {
+                "name": "EcoManagement"
+            },
+            "background_image": {
+                "name": "Image d'arrière-plan"
+            },
+            "button_tone": {
+                "name": "Bip des touches"
+            },
+            "drum_light": {
+                "name": "Éclairage du tambour"
+            },
+            "hygiene_info": {
+                "name": "Info hygiène"
+            },
+            "soft_water": {
+                "name": "Eau douce"
+            },
+            "multi_component_detergent": {
+                "name": "Lessive multicomposant"
+            },
+            "silent": {
+                "name": "Silent"
+            },
+            "reverse_plus": {
+                "name": "ReversePlus"
             }
         },
         "select": {
@@ -200,6 +302,60 @@
                     "hygiene": "Hygiène",
                     "pre_rinsing": "Prélavage"
                 }
+            },
+            "button_tone": {
+                "name": "Bip des touches"
+            },
+            "signal_tone": {
+                "name": "Signal sonore"
+            },
+            "rinse_aid": {
+                "name": "Produit de rinçage"
+            },
+            "water_hardness_unit": {
+                "name": "Unité de dureté de l'eau"
+            },
+            "water_hardness": {
+                "name": "Dureté de l'eau"
+            },
+            "temperature_unit": {
+                "name": "Unité de température"
+            },
+            "interior_lighting": {
+                "name": "Éclairage intérieur"
+            },
+            "function_light": {
+                "name": "FunctionLight"
+            },
+            "storage_tank": {
+                "name": "Réservoir de stockage"
+            },
+            "hot_water_connection": {
+                "name": "Raccordement à l'eau chaude"
+            },
+            "spin_speed": {
+                "name": "Essorage"
+            },
+            "delayed_start_time": {
+                "name": "Heure du départ différé"
+            },
+            "aqua_plus": {
+                "name": "AquaPlus"
+            },
+            "soiling": {
+                "name": "Degré de salissure"
+            },
+            "anti_crease": {
+                "name": "Défroissage"
+            },
+            "eco_hybrid": {
+                "name": "eHybrid"
+            },
+            "default_mode": {
+                "name": "Mode par défaut"
+            },
+            "viewing_angle": {
+                "name": "Angle de vue"
             }
         }
     },

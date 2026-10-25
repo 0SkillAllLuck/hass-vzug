@@ -1,4 +1,5 @@
 import contextlib
+import re
 from collections.abc import AsyncIterator, Callable, Hashable, Iterable, Iterator
 
 import httpx
@@ -9,7 +10,6 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import ChildDeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.typing import UndefinedType
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -111,6 +111,101 @@ def user_config_commands(
             yield (category.key, command.get("command", "")), command
 
 
+# translation keys of the settings we know, by command type (which picks the platform)
+# and command key. The appliance families spell the same setting differently
+# ('CHILD_PROOF_LOCK', 'ChildproofXlock', 'childproofXlock'), see '_normalize'.
+_SETTING_TRANSLATION_KEYS: dict[str, dict[str, str]] = {
+    "boolean": {
+        "pineco": "energy_saving",
+        "pinpartialload": "partial_load",
+        "pinrinseplus": "rinse_plus",
+        "pindryplus": "dry_plus",
+        "pinsteamfinish": "steam_finish",
+        "pinoptistart": "opti_start",
+        "allinone": "all_in_one",
+        "childprooflock": "child_lock",
+        "autodooropener": "auto_door_opener",
+        "dspctrldoorangle": "door_angle_control",
+        "standbyautomatic": "auto_standby",
+        "emptytankonpowerfailure": "empty_tank_on_power_failure",
+        "ecomgmtinfo": "eco_management",
+        "ecom": "eco_management",
+        "ecomanagement": "eco_management",
+        "backgroundimage": "background_image",
+        "backgrounimage": "background_image",
+        "buttontone": "button_tone",
+        "trommellicht": "drum_light",
+        "drumillumination": "drum_light",
+        "hygieneinformation": "hygiene_info",
+        "softwater": "soft_water",
+        "multicompdetergent": "multi_component_detergent",
+        "silent": "silent",
+        "reverseplus": "reverse_plus",
+    },
+    "range": {
+        "pinstarttime": "delayed_start",
+        "dspillumination": "brightness",
+        "brightness": "brightness",
+        "levelofdryness": "dryness_level",
+    },
+    "selection": {
+        "dspbuttonsound": "button_tone",
+        "dspsignalsound": "signal_tone",
+        "brightener": "rinse_aid",
+        "waterhardnessunit": "water_hardness_unit",
+        "waterhardness": "water_hardness",
+        "temperatureunit": "temperature_unit",
+        "interiorlighting": "interior_lighting",
+        "functionlight": "function_light",
+        "tankstorageduration": "storage_tank",
+        "hotwater": "hot_water_connection",
+        "spinningat": "spin_speed",
+        "startdelay": "delayed_start_time",
+        "aquaplus": "aqua_plus",
+        "soiling": "soiling",
+        "loosenup": "anti_crease",
+        "ecohybrid": "eco_hybrid",
+        "standardmode": "default_mode",
+        "viewingangle": "viewing_angle",
+    },
+    "status": {
+        "ecomgmtenergyprogram": "last_program_energy",
+        "ecomgmtwaterprogram": "last_program_water",
+        "ecomgmtenergyavg": "average_energy",
+        "ecomgmtwateravg": "average_water",
+        "ecomgmtenergytotal": "total_energy",
+        "ecomgmtwatertotal": "total_water",
+        "totalconsumption": "total_consumption",
+        "totalconsumptiondrumdry": "total_consumption",
+        "ecomstattotal": "total_consumption",
+        "averagepercycle": "average_per_cycle",
+        "averagepercycledrumdry": "average_per_cycle",
+        "ecomstatavarage": "average_per_cycle",
+    },
+    "action": {
+        "ecomgmtresettotal": "reset_total_consumption",
+        "totalconsumptiondel": "reset_total_consumption",
+        "ecomstattotalclear": "reset_total_consumption",
+        "ecomgmtresetavg": "reset_average_per_cycle",
+        "averagepercycledel": "reset_average_per_cycle",
+        "ecomstatavarageclear": "reset_average_per_cycle",
+    },
+}
+
+
+def _normalize(command_key: str) -> str:
+    """'CHILD_PROOF_LOCK', 'childproofXlock' -> 'childprooflock'
+
+    The newer families use a capital X between words instead of a space.
+    """
+    return re.sub(r"(?<=[a-z])X|_", "", command_key).lower()
+
+
+def setting_translation_key(command_type: str, command_key: str) -> str | None:
+    """Translation key of a config-tree setting, None if we don't know it."""
+    return _SETTING_TRANSLATION_KEYS.get(command_type, {}).get(_normalize(command_key))
+
+
 class UserConfigEntity(CoordinatorEntity[ConfigCoordinator]):
     _attr_has_entity_name = True
     # fixed, not taken from 'alterable': HA only reads the category when it adds
@@ -133,6 +228,13 @@ class UserConfigEntity(CoordinatorEntity[ConfigCoordinator]):
             "category_key": category_key,
             "command_key": command_key,
         }
+        self._attr_translation_key = setting_translation_key(
+            self.vzug_command.get("type", ""), command_key
+        )
+        if self._attr_translation_key is None:
+            # a setting we don't know, e.g. from newer firmware: the appliance's own
+            # text, in the language set on the appliance
+            self._attr_name = self.vzug_command.get("description") or command_key
 
     @property
     def vzug_command(self) -> api.Command:
@@ -142,13 +244,6 @@ class UserConfigEntity(CoordinatorEntity[ConfigCoordinator]):
             ]
         except LookupError:
             return api.Command()
-
-    @property
-    def name(self) -> str | UndefinedType | None:
-        name = self.vzug_command.get("description")
-        if not name:
-            name = self.vzug_command_key
-        return name
 
     def ensure_alterable(self) -> None:
         """Refuse a change the appliance doesn't allow right now.
