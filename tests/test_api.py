@@ -1,6 +1,7 @@
 import httpx
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
+import httpcore
 from custom_components.vzug.api import (
     ZH_MODE_WARMUP_MAX_FAILURES,
     AggCategory,
@@ -256,9 +257,9 @@ async def test_aggregate_config_stops_retrying_without_categories(vzug_api):
 async def test_transport_error_counts_as_attempt(vzug_api):
     """A transport error must not restart the loop without incrementing the counter."""
     with patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get:
-        mock_get.side_effect = httpx.ReadTimeout("")
+        mock_get.side_effect = httpx.RemoteProtocolError("")
 
-        with pytest.raises(httpx.ReadTimeout):
+        with pytest.raises(httpx.RemoteProtocolError):
             await vzug_api._command(
                 "hh", command="getEcoInfo", attempts=3, retry_delay=0.0
             )
@@ -402,3 +403,89 @@ async def test_set_program_sends_compact_json(vzug_api):
     assert mock_command.call_args.kwargs["params"]["value"] == (
         '{"dryPlus":false,"rinsePlus":false,"id":50}'
     )
+
+
+@pytest.mark.asyncio
+async def test_unreachable_appliance_is_tried_once(vzug_api):
+    """Neither httpx nor '_command' may retry a connection that can't be made.
+
+    Both used to: one command against a switched off appliance took minutes, and
+    with one connection per appliance everything else waited for it.
+    """
+    with (
+        patch(
+            "httpcore._backends.auto.AutoBackend.connect_tcp",
+            new_callable=AsyncMock,
+            side_effect=httpcore.ConnectError("unreachable"),
+        ) as connect,
+        patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        result = await vzug_api.get_device_status(default_on_error=True)
+
+        assert result == {}
+        assert connect.call_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error", [httpx.ConnectError(""), httpx.ConnectTimeout(""), httpx.ReadTimeout("")]
+)
+async def test_no_answer_is_not_retried(vzug_api, error):
+    with (
+        patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get,
+        patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_get.side_effect = error
+
+        with pytest.raises(type(error)):
+            await vzug_api.get_eco_info()
+
+        assert mock_get.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_server_error_is_still_retried(vzug_api):
+    """A busy appliance answers 503, that's worth the full set of attempts."""
+    with (
+        patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get,
+        patch(
+            "custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock
+        ) as sleep,
+    ):
+        mock_get.side_effect = [_status_response(503)] * 4 + [
+            _json_response({"water": {"total": 1}})
+        ]
+
+        result = await vzug_api.get_eco_info()
+
+        assert result == {"water": {"total": 1}}
+        assert mock_get.call_count == 5
+        assert [c.args[0] for c in sleep.await_args_list] == [0, 2, 4, 6, 8]
+
+
+def test_client_timeouts(vzug_api):
+    timeout = vzug_api._client.timeout
+    assert timeout.connect == 3.0
+    assert timeout.read == 5.0
+    # the single connection is a queue, waiting in it must not count as a failure
+    assert timeout.pool is None
+
+
+@pytest.mark.asyncio
+async def test_aggregate_config_stops_at_the_first_failure(vzug_api):
+    """The rest of the commands must not stay queued for an appliance that's gone."""
+    with (
+        patch.object(vzug_api, "list_categories", new_callable=AsyncMock) as categories,
+        patch.object(vzug_api, "get_category", new_callable=AsyncMock) as category,
+        patch.object(vzug_api, "list_commands", new_callable=AsyncMock) as commands,
+        patch.object(vzug_api, "get_command", new_callable=AsyncMock) as command,
+    ):
+        categories.return_value = ["settings"]
+        category.return_value = {"description": "Einstellungen"}
+        commands.return_value = ["a", "b", "c"]
+        command.side_effect = httpx.ConnectTimeout("")
+
+        with pytest.raises(httpx.ConnectTimeout):
+            await vzug_api.aggregate_config()
+
+        assert command.call_count == 1

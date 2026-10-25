@@ -271,9 +271,16 @@ class VZugApi:
             # requests run at the same time. A 4xx isn't retried, so a single such
             # answer fails the whole config refresh. One connection at a time.
             limits=httpx.Limits(max_connections=1, max_keepalive_connections=1),
-            retries=5,
         )
-        self._client = httpx.AsyncClient(auth=auth, transport=transport)
+        self._client = httpx.AsyncClient(
+            auth=auth,
+            transport=transport,
+            # On the LAN a connection is made in milliseconds, so 3s is plenty and an
+            # appliance that is switched off gives up quickly. No pool timeout: with a
+            # single connection the pool is the queue, and every request in front of
+            # this one is bounded by its own timeouts already.
+            timeout=httpx.Timeout(5.0, connect=3.0, pool=None),
+        )
         self._base_url = URL(base_url)
         # consecutive warm-up failures, see ZH_MODE_WARMUP_MAX_FAILURES
         self._zh_mode_warmup_failures = 0
@@ -384,6 +391,14 @@ class VZugApi:
 
                 last_exc = err
                 _LOGGER.debug("server error: %s", err.response)
+            except (httpx.ConnectError, httpx.TimeoutException) as err:
+                # Nothing answered in time: the appliance is switched off or out of
+                # reach. A busy one answers quickly with 503, 400.03 or '200 []'
+                # instead, which is retried. Another attempt would only keep the
+                # single connection, and every other request to this appliance, waiting.
+                last_exc = err
+                _LOGGER.debug("no answer, not retrying: %r", err)
+                break
             except httpx.TransportError as err:
                 last_exc = err
                 _LOGGER.debug("transport error: %r", err)
@@ -568,13 +583,11 @@ class VZugApi:
                 commands={},
             )
 
-            async def handle_command_key(command_key: str) -> None:
-                command_raw = await self.get_command(command_key)
-                category.commands[command_key] = command_raw
-
-            await asyncio.gather(
-                *(handle_command_key(command_key) for command_key in command_keys)
-            )
+            # one at a time: they queue for the single connection anyway, and this
+            # way the first failure ends the refresh instead of leaving the rest of
+            # the commands queued, each waiting for its own timeout.
+            for command_key in command_keys:
+                category.commands[command_key] = await self.get_command(command_key)
             config_tree[category_key] = category
         return config_tree
 
