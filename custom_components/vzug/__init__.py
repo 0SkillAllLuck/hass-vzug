@@ -33,7 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     except KeyError:
         credentials = None
-    shared = Shared(hass, base_url, credentials)
+    shared = Shared(hass, entry, base_url, credentials)
     await shared.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
@@ -88,7 +88,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except KeyError:
             credentials = None
         base_url = URL(new_data[CONF_BASE_URL])
-        shared = Shared(hass, base_url, credentials)
+        shared = Shared(hass, entry, base_url, credentials)
         await shared.async_config_entry_first_refresh()
 
         old_prefix = shared.state_coord.data.device.get(
