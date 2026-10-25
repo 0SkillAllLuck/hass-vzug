@@ -11,8 +11,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 from homeassistant.config_entries import ConfigEntryState, current_entry
+from homeassistant.exceptions import ConfigEntryNotReady
 
-from custom_components.vzug import async_setup_entry
+from custom_components.vzug import async_setup_entry, async_unload_entry
 from custom_components.vzug.const import CONF_BASE_URL, DOMAIN
 from custom_components.vzug.shared import UNREACHABLE_RETRY_INTERVAL, Shared
 
@@ -95,6 +96,8 @@ class Setup:
         self.entry.async_create_background_task = (
             lambda hass, target, name, eager_start=True: self.background.append(target)
         )
+        self.on_unload: list = []
+        self.entry.async_on_unload = self.on_unload.append
 
     def _add(self, entities, update_before_add=False) -> None:
         for entity in entities:
@@ -133,6 +136,12 @@ class Setup:
         """Set the entry up, returning the number of requests it took."""
         assert await async_setup_entry(self.hass, self.entry)
         return len(self.appliance.requests)
+
+    async def run_on_unload(self) -> None:
+        """What HA does after 'async_unload_entry', or after a failed setup."""
+        while self.on_unload:
+            if job := self.on_unload.pop()():
+                await job
 
     async def run_background(self) -> int:
         """Run what the setup left for later, returning the number of requests."""
@@ -221,3 +230,34 @@ async def test_failing_background_refresh_is_retried():
         setup.appliance.busy.clear()
         await config._handle_refresh_interval()
         assert "config" in _coordinators(setup)
+
+
+@pytest.mark.asyncio
+async def test_unload_closes_the_client():
+    with Setup(DISHWASHER) as setup:
+        await setup.setup()
+        await setup.run_background()
+        shared = setup.shared
+        setup.hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
+
+        assert await async_unload_entry(setup.hass, setup.entry)
+        assert not shared.client._client.is_closed
+        await setup.run_on_unload()
+
+        assert shared.client._client.is_closed
+        assert shared.state_coord._shutdown_requested
+
+
+@pytest.mark.asyncio
+async def test_failed_setup_closes_the_client():
+    """HA retries it with a new client every time, for as long as it is off."""
+    with Setup(DISHWASHER) as setup:
+        setup.appliance.busy.add("getMacAddress")
+        with pytest.raises(ConfigEntryNotReady):
+            await setup.setup()
+        shared = next(
+            job.__self__ for job in setup.on_unload if isinstance(job.__self__, Shared)
+        )
+
+        await setup.run_on_unload()
+        assert shared.client._client.is_closed
