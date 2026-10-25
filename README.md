@@ -36,6 +36,8 @@ Don't hesitate to open a new issue or a discussion if you have a V-ZUG device yo
 3. Restart Home Assistant.
 4. Set up the integration using the UI: [![Add Integration](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=vzug)
 
+On Home Assistant 2026.11 or newer, HACS is built in as the Marketplace under **Settings** > **Marketplace**. The **Add Repository** button in step 1 opens the repository there, or you can add it yourself with **Add from link**.
+
 ## Features
 
 - Firmware updates and notifications.
