@@ -332,6 +332,12 @@ class Shared:
                 "unable to determine unique id from device data: %s", self.meta
             )
 
+        # left out rather than "" when the appliance doesn't tell (no 'getDeviceInfo'),
+        # the registry then keeps what it already has
+        optional = {
+            "model_id": self.meta.model_id,
+            "serial_number": self.meta.serial_number,
+        }
         # built in one go, the entities are only created after this. Since HA 2026.11
         # it is a dataclass, '.update()' only works through a compatibility layer.
         self.device_info = DeviceInfo(
@@ -341,7 +347,9 @@ class Shared:
             hw_version=self.meta.ai_fw_version.get("HW"),
             sw_version=self.meta.ai_fw_version.get("SW"),
             connections={(dr.CONNECTION_NETWORK_MAC, mac_addr)},
+            manufacturer="V-ZUG",
             model=self.meta.model_name,
+            **{key: value for key, value in optional.items() if value},
         )
 
         self._first_refresh_done = True
