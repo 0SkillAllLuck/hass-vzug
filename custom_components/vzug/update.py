@@ -66,10 +66,14 @@ class VZugUpdate(UpdateEntity, CoordinatorEntity[UpdateCoordinator]):
         return api.UpdateComponent()
 
     @property
-    def in_progress(self) -> bool | int | None:
+    def in_progress(self) -> bool:
+        return bool(self.get_update_component().get("running", False))
+
+    @property
+    def update_percentage(self) -> int | None:
         component = self.get_update_component()
         if not component.get("running", False):
-            return False
+            return None
 
         try:
             progress = component["progress"]
