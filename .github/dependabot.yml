@@ -13,6 +13,9 @@ updates:
     ignore:
       # Dependabot should not update Home Assistant as that should match the homeassistant key in hacs.json
       - dependency-name: "homeassistant"
+      # Tests should run the json-repair that users get, so bump it together with manifest.json
+      - dependency-name: "json-repair"
+        versions: [">=0.47"]
     groups:
       pip-dependencies:
         patterns: [ "*" ]
