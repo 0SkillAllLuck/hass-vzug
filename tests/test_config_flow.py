@@ -91,6 +91,8 @@ def _entry(**data) -> SimpleNamespace:
         source="user",
         state=ConfigEntryState.LOADED,
         options={},
+        # HA 2026.10 checks this before it reloads an updated entry.
+        update_listeners=[],
         data={
             "username": None,
             "password": None,
