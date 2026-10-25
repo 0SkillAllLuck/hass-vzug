@@ -84,9 +84,8 @@ def setup():
     shared.zone_coord.last_update_success = False
     shared.program_coord = None
 
-    hass = MagicMock()
-    hass.data = {DOMAIN: {entry.entry_id: shared}}
-    return hass, entry, shared
+    entry.runtime_data = shared
+    return MagicMock(), entry, shared
 
 
 @pytest.mark.asyncio

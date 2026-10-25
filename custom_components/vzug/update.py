@@ -5,23 +5,24 @@ from homeassistant.components.update import (
     UpdateEntity,
     UpdateEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import api
-from .const import DOMAIN
 from .helpers import add_entities_when_ready
-from .shared import Shared, UpdateCoordinator
+from .shared import Shared, UpdateCoordinator, VZugConfigEntry
+
+# the appliance handles one request at a time, see 'api.VZugApi.__init__'
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    config_entry: VZugConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    shared: Shared = hass.data[DOMAIN][config_entry.entry_id]
+    shared = config_entry.runtime_data
 
     if shared.meta.supports_update_status():
         add_entities_when_ready(
@@ -65,10 +66,14 @@ class VZugUpdate(UpdateEntity, CoordinatorEntity[UpdateCoordinator]):
         return api.UpdateComponent()
 
     @property
-    def in_progress(self) -> bool | int | None:
+    def in_progress(self) -> bool:
+        return bool(self.get_update_component().get("running", False))
+
+    @property
+    def update_percentage(self) -> int | None:
         component = self.get_update_component()
         if not component.get("running", False):
-            return False
+            return None
 
         try:
             progress = component["progress"]

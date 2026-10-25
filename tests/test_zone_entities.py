@@ -166,6 +166,7 @@ def test_zone_disappearing_makes_entities_unavailable():
 def bare_shared():
     instance = Shared.__new__(Shared)
     instance.hass = MagicMock()
+    instance.entry = MagicMock()
     instance.client = MagicMock()
     instance.zone_coord = None
     instance._zone_modes = ()

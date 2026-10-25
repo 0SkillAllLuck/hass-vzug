@@ -8,7 +8,6 @@ import pytest
 
 from custom_components.vzug import sensor, switch
 from custom_components.vzug.api import AggCategory, AggState
-from custom_components.vzug.const import DOMAIN
 from custom_components.vzug.helpers import add_entities_as_they_appear
 
 PREFIX = "fc:1b:ff:06:6e:8e"
@@ -58,8 +57,8 @@ def _setup(config, eco_info=None):
         unique_id_prefix=PREFIX,
         device_info={},
     )
-    hass = SimpleNamespace(data={DOMAIN: {"entry": shared}})
-    entry = MagicMock(entry_id="entry")
+    hass = SimpleNamespace(data={})
+    entry = MagicMock(entry_id="entry", runtime_data=shared)
     added = []
 
     def add(entities, update_before_add=False):

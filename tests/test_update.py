@@ -146,3 +146,34 @@ def test_last_answer_is_dropped_with_a_new_firmware():
     _write(entity, _data("1052633-R20", status_failed=True))
 
     assert entity.latest_version is None
+
+
+@pytest.mark.parametrize(
+    ("component", "in_progress", "percentage"),
+    [
+        ({"name": "AI", "available": True, "running": False}, False, None),
+        (
+            {
+                "name": "AI",
+                "available": True,
+                "running": True,
+                "progress": {"download": 100, "installation": 30},
+            },
+            True,
+            65,
+        ),
+        # the run has just started, 0% is still in progress
+        ({"name": "AI", "available": True, "running": True}, True, 0),
+    ],
+    ids=["idle", "installing", "starting"],
+)
+def test_progress(component, in_progress, percentage):
+    data = _data(ai_update=True)
+    data.update["components"] = [component]
+    entity = _entity(data)
+
+    # not a percentage, HA only takes that through a compatibility shim
+    assert entity.in_progress is in_progress
+    attributes = entity.state_attributes
+    assert attributes["in_progress"] is in_progress
+    assert attributes["update_percentage"] == percentage

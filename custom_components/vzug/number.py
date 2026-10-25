@@ -4,13 +4,11 @@ from homeassistant.components.number import (
     NumberMode,
     RestoreNumber,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import api, zones
-from .const import DOMAIN
 from .helpers import (
     UserConfigEntity,
     ZoneEntity,
@@ -20,7 +18,10 @@ from .helpers import (
     user_config_commands,
     zone_translation,
 )
-from .shared import Shared
+from .shared import Shared, VZugConfigEntry
+
+# the appliance handles one request at a time, see 'api.VZugApi.__init__'
+PARALLEL_UPDATES = 1
 
 # what the V-ZUG app offers first when a timed function is switched on
 DEFAULT_BOOST_HOURS = 12.0
@@ -28,10 +29,10 @@ DEFAULT_BOOST_HOURS = 12.0
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    config_entry: VZugConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    shared: Shared = hass.data[DOMAIN][config_entry.entry_id]
+    shared = config_entry.runtime_data
 
     if shared.zone_coord is not None:
         add_entities_when_ready(

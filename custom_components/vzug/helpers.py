@@ -4,7 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import UndefinedType
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -18,7 +18,7 @@ from .shared import ConfigCoordinator, Shared, ZoneCoordinator
 def add_entities_as_they_appear[T, K: Hashable, V](
     config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator[T],
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
     candidates: Callable[[T], Iterable[tuple[K, V]]],
     factory: Callable[[K, V], Entity | None],
 ) -> None:
@@ -53,7 +53,7 @@ def add_entities_as_they_appear[T, K: Hashable, V](
 def add_entities_when_ready(
     config_entry: ConfigEntry,
     coordinator: DataUpdateCoordinator,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
     build: Callable[[], Iterable[Entity]],
 ) -> None:
     """Add the entities 'build' returns once the coordinator has data.

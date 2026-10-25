@@ -1,6 +1,5 @@
 import logging
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
@@ -9,7 +8,7 @@ from yarl import URL
 
 from . import api
 from .const import CONF_BASE_URL, DOMAIN
-from .shared import Shared
+from .shared import Shared, VZugConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ PLATFORMS: list[Platform] = [
 ]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: VZugConfigEntry) -> bool:
     """Set up V-ZUG from a config entry."""
     base_url = URL(entry.data[CONF_BASE_URL])
     try:
@@ -41,8 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(shared.async_shutdown)
     await shared.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = shared
+    entry.runtime_data = shared
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_create_background_task(
@@ -52,15 +50,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: VZugConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
-
-    return unload_ok
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, entry: VZugConfigEntry) -> bool:
     version_tuple = (entry.version, entry.minor_version)
     _LOGGER.debug("migrating from version %s.%s", entry.version, entry.minor_version)
 

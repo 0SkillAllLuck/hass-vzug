@@ -10,11 +10,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from homeassistant.config_entries import ConfigEntryState, current_entry
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components.vzug import async_setup_entry, async_unload_entry
-from custom_components.vzug.const import CONF_BASE_URL, DOMAIN
+from custom_components.vzug.const import CONF_BASE_URL
 from custom_components.vzug.shared import UNREACHABLE_RETRY_INTERVAL, Shared
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -111,12 +111,10 @@ class Setup:
 
     @property
     def shared(self) -> Shared:
-        return self.hass.data[DOMAIN]["entry"]
+        return self.entry.runtime_data
 
     def __enter__(self) -> "Setup":
         self.hass.loop = asyncio.get_running_loop()
-        # the coordinators find their entry the same way during a real setup
-        self._token = current_entry.set(self.entry)
         self._patches = [
             patch.object(httpx.AsyncClient, "get", self.appliance.get),
             patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
@@ -130,7 +128,6 @@ class Setup:
             target.close()
         for p in self._patches:
             p.stop()
-        current_entry.reset(self._token)
 
     async def setup(self) -> int:
         """Set the entry up, returning the number of requests it took."""
@@ -209,6 +206,41 @@ async def test_the_rest_arrives_after_the_setup(device, coordinators):
         await setup.run_background()
 
         assert set(_coordinators(setup)) == coordinators
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("device", [DISHWASHER, OVEN])
+async def test_unchanged_answers_leave_the_entities_alone(device):
+    """'always_update=False' relies on the data comparing by value."""
+    with Setup(device) as setup:
+        await setup.setup()
+        await setup.run_background()
+        shared = setup.shared
+
+        coordinators = [
+            coord
+            for coord in (
+                shared.state_coord,
+                shared.update_coord,
+                shared.config_coord,
+                shared.zone_coord,
+                shared.program_coord,
+            )
+            if coord is not None
+        ]
+        assert len(coordinators) == 4
+        for coord in coordinators:
+            assert coord.config_entry is setup.entry
+            calls = []
+            unsub = coord.async_add_listener(lambda: calls.append(1))
+            # a fresh object every time, but the same answers
+            before = coord.data
+            await coord.async_refresh()
+            unsub()
+
+            assert coord.last_update_success
+            assert coord.data is not before
+            assert calls == [], coord.name
 
 
 @pytest.mark.asyncio

@@ -68,10 +68,12 @@ STATE_MAX_STALE_UPDATES = 3
 # they look again every minute instead, so their entities come back along with it.
 UNREACHABLE_RETRY_INTERVAL = timedelta(minutes=1)
 
+type VZugConfigEntry = ConfigEntry[Shared]
+
 
 class Shared:
     hass: HomeAssistant
-    entry: ConfigEntry
+    entry: VZugConfigEntry
     client: api.VZugApi
 
     state_coord: StateCoordinator
@@ -87,7 +89,7 @@ class Shared:
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: ConfigEntry,
+        entry: VZugConfigEntry,
         base_url: yarl.URL,
         credentials: api.Credentials | None,
     ) -> None:
@@ -98,9 +100,13 @@ class Shared:
             credentials=credentials,
         )
 
+        # 'always_update=False': the entities only show the data, so an unchanged
+        # answer has nothing to tell them
         self.state_coord = DataUpdateCoordinator(
             hass,
             _LOGGER,
+            config_entry=entry,
+            always_update=False,
             name="state",
             update_interval=STATE_COORD_ACTIVE_INTERVAL,
             update_method=self._fetch_state,
@@ -108,6 +114,8 @@ class Shared:
         self.update_coord = DataUpdateCoordinator(
             hass,
             _LOGGER,
+            config_entry=entry,
+            always_update=False,
             name="update",
             update_interval=UPDATE_COORD_IDLE_INTERVAL,
             update_method=self._fetch_update,
@@ -115,6 +123,8 @@ class Shared:
         self.config_coord = DataUpdateCoordinator(
             hass,
             _LOGGER,
+            config_entry=entry,
+            always_update=False,
             name="config",
             update_interval=CONFIG_COORD_INTERVAL,
             update_method=self._fetch_config,
@@ -132,7 +142,6 @@ class Shared:
 
         # the rest will be set on first refresh
         self.unique_id_prefix = ""
-        self.device_info = DeviceInfo()
         self._first_refresh_done = False
         self._config_stale_count = 0
         self._eco_stale_count = 0
@@ -207,6 +216,8 @@ class Shared:
             self.program_coord = DataUpdateCoordinator(
                 self.hass,
                 _LOGGER,
+                config_entry=self.entry,
+                always_update=False,
                 name="programs",
                 update_method=self._fetch_programs,
             )
@@ -215,6 +226,8 @@ class Shared:
         self.zone_coord = DataUpdateCoordinator(
             self.hass,
             _LOGGER,
+            config_entry=self.entry,
+            always_update=False,
             name="zones",
             update_interval=ZONE_COORD_INTERVAL,
             update_method=self._fetch_zones,
@@ -313,20 +326,20 @@ class Shared:
         mac_addr = dr.format_mac(self.meta.mac_address)
         self.unique_id_prefix = mac_addr
         if not self.unique_id_prefix:
-            _LOGGER.warn(
+            _LOGGER.warning(
                 "unable to determine unique id from device data: %s", self.meta
             )
 
-        self.device_info.update(
-            DeviceInfo(
-                configuration_url=str(self.client.base_url),
-                identifiers={(DOMAIN, self.meta.serial_number)},
-                name=self.meta.create_name(),
-                hw_version=self.meta.ai_fw_version.get("HW"),
-                sw_version=self.meta.ai_fw_version.get("SW"),
-                connections={(dr.CONNECTION_NETWORK_MAC, mac_addr)},
-                model=self.meta.model_name,
-            )
+        # built in one go, the entities are only created after this. Since HA 2026.11
+        # it is a dataclass, '.update()' only works through a compatibility layer.
+        self.device_info = DeviceInfo(
+            configuration_url=str(self.client.base_url),
+            identifiers={(DOMAIN, self.meta.serial_number)},
+            name=self.meta.create_name(),
+            hw_version=self.meta.ai_fw_version.get("HW"),
+            sw_version=self.meta.ai_fw_version.get("SW"),
+            connections={(dr.CONNECTION_NETWORK_MAC, mac_addr)},
+            model=self.meta.model_name,
         )
 
         self._first_refresh_done = True
