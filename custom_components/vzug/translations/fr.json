@@ -5,6 +5,7 @@
             "false_discovery": "Découverte fausse positive",
             "discovery_finished": "{count} appareil(s) découvert(s)",
             "reauth_successful": "Réauthentification réussie",
+            "reconfigure_successful": "Reconfiguration réussie",
             "unique_id_mismatch": "Ce n'est pas l'appareil qui a été configuré"
         },
         "error": {
@@ -20,6 +21,16 @@
                 }
             },
             "manual": {
+                "data": {
+                    "host": "Nom d'hôte"
+                },
+                "data_description": {
+                    "host": "L'adresse IP, l'hôte ou l'URL de base de l'appareil"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigurer",
+                "description": "Change l'adresse de l'appareil.",
                 "data": {
                     "host": "Nom d'hôte"
                 },

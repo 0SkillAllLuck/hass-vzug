@@ -5,6 +5,7 @@
             "false_discovery": "False-positive Discovery",
             "discovery_finished": "Discovered {count} device(s)",
             "reauth_successful": "Re-authentication was successful",
+            "reconfigure_successful": "Reconfiguration was successful",
             "unique_id_mismatch": "This is a different appliance than the one that was set up"
         },
         "error": {
@@ -20,6 +21,16 @@
                 }
             },
             "manual": {
+                "data": {
+                    "host": "Host"
+                },
+                "data_description": {
+                    "host": "The IP address, host, or base url of the device"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigure",
+                "description": "Change the address of the appliance.",
                 "data": {
                     "host": "Host"
                 },

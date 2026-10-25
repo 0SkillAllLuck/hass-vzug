@@ -5,6 +5,7 @@
       "false_discovery": "Falsch positive Entdeckung",
       "discovery_finished": "{count} Gerät(e) entdeckt",
       "reauth_successful": "Erneute Authentifizierung erfolgreich",
+      "reconfigure_successful": "Neukonfiguration erfolgreich",
       "unique_id_mismatch": "Das ist ein anderes Gerät als das eingerichtete"
     },
     "error": {
@@ -20,6 +21,16 @@
         }
       },
       "manual": {
+        "data": {
+          "host": "Host"
+        },
+        "data_description": {
+          "host": "Die IP-Adresse, der Host oder die Basis-URL des Geräts"
+        }
+      },
+      "reconfigure": {
+        "title": "Neu konfigurieren",
+        "description": "Ändere die Adresse des Geräts.",
         "data": {
           "host": "Host"
         },

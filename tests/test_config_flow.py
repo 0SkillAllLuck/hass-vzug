@@ -239,3 +239,60 @@ async def test_reauth_aborts_for_another_appliance():
     assert result["reason"] == "unique_id_mismatch"
     assert entry.data["password"] == "old"
     flow.hass.config_entries.async_schedule_reload.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_changes_the_host():
+    entry = _entry(username="admin", password="secret")
+    flow = _flow("reconfigure", entry, entry_id="entry")
+    credentials: list = []
+    with _appliance(OSError(), _meta(), credentials=credentials):
+        result = await _step(flow.async_step_reconfigure())
+        assert result["step_id"] == "reconfigure"
+        (host,) = result["data_schema"].schema
+        assert host.description == {"suggested_value": "http://192.0.2.1"}
+
+        result = await _step(flow.async_step_reconfigure({"host": "192.0.2.2"}))
+        assert result["errors"] == {"base": "cannot_connect"}
+        result = await _step(flow.async_step_reconfigure({"host": "192.0.2.2"}))
+
+    assert result["reason"] == "reconfigure_successful"
+    # the stored credentials were tried, and kept
+    assert credentials[-1] == api.Credentials(username="admin", password="secret")
+    assert entry.data == {
+        "username": "admin",
+        "password": "secret",
+        "base_url": "http://192.0.2.2",
+    }
+    flow.hass.config_entries.async_schedule_reload.assert_called_once_with("entry")
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_asks_for_credentials_the_new_host_needs():
+    entry = _entry()
+    flow = _flow("reconfigure", entry, entry_id="entry")
+    with _appliance(api.AuthenticationFailed(), _meta()):
+        result = await _step(flow.async_step_reconfigure({"host": "192.0.2.2"}))
+        assert result["step_id"] == "auth"
+        result = await _step(
+            flow.async_step_auth({"username": "admin", "password": "secret"})
+        )
+
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data == {
+        "username": "admin",
+        "password": "secret",
+        "base_url": "http://192.0.2.2",
+    }
+
+
+@pytest.mark.asyncio
+async def test_reconfigure_aborts_for_another_appliance():
+    entry = _entry()
+    flow = _flow("reconfigure", entry, entry_id="entry")
+    with _appliance(_meta("FC1BFF000002")):
+        result = await _step(flow.async_step_reconfigure({"host": "192.0.2.2"}))
+
+    assert result["reason"] == "unique_id_mismatch"
+    assert entry.data["base_url"] == "http://192.0.2.1"
+    flow.hass.config_entries.async_schedule_reload.assert_not_called()

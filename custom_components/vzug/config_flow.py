@@ -35,6 +35,8 @@ ERR_AUTH_FAILED = "auth_failed"
 ERR_INVALID_HOST = "invalid_host"
 ERR_CANNOT_CONNECT = "cannot_connect"
 
+_HOST_SCHEMA = vol.Schema({vol.Required(CONF_HOST): str})
+
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for V-ZUG."""
@@ -80,6 +82,25 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        return await self._async_step_host("manual", user_input)
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        data = self._get_reconfigure_entry().data
+        # try the stored credentials at the new host; the auth step asks if they fail
+        self._username = data.get(CONF_USERNAME)
+        self._password = data.get(CONF_PASSWORD)
+        return await self._async_step_host(
+            "reconfigure", user_input, {CONF_HOST: data[CONF_BASE_URL]}
+        )
+
+    async def _async_step_host(
+        self,
+        step_id: str,
+        user_input: dict[str, Any] | None,
+        suggested_values: dict[str, Any] | None = None,
+    ) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
@@ -96,11 +117,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return res
 
         return self.async_show_form(
-            step_id="manual",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_HOST): str,
-                }
+            step_id=step_id,
+            data_schema=self.add_suggested_values_to_schema(
+                _HOST_SCHEMA, suggested_values
             ),
             errors=errors,
         )
@@ -235,7 +254,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # only discoveries give way to another flow for the same appliance
             raise_on_progress=self.source in config_entries.DISCOVERY_SOURCES,
         )
-        if self.source == config_entries.SOURCE_REAUTH:
+        if self.source in (
+            config_entries.SOURCE_REAUTH,
+            config_entries.SOURCE_RECONFIGURE,
+        ):
             self._abort_if_unique_id_mismatch()
         elif self.source == config_entries.SOURCE_USER:
             self._abort_if_unique_id_configured()
@@ -257,6 +279,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if self.source == config_entries.SOURCE_REAUTH:
             return self.async_update_reload_and_abort(
                 self._get_reauth_entry(), data_updates=data
+            )
+        if self.source == config_entries.SOURCE_RECONFIGURE:
+            return self.async_update_reload_and_abort(
+                self._get_reconfigure_entry(), data_updates=data
             )
 
         _LOGGER.debug("creating entry")
