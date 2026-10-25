@@ -218,6 +218,7 @@ class AggMeta:
     device_name: str
     serial_number: str
     api_version: tuple[int, ...]
+    ai_fw_version: AiFwVersion = dataclasses.field(default_factory=AiFwVersion)
 
     def create_name(self) -> str:
         if name := self.device_name.strip():
@@ -551,6 +552,7 @@ class VZugApi:
                 device_name=device_info.get("name", ""),
                 serial_number=device_info.get("serialNumber", ""),
                 api_version=hh_api_version,
+                ai_fw_version=ai_firmware,
             )
         else:
             raw_api_version = ai_firmware.get("apiVersion", "")
@@ -563,6 +565,7 @@ class VZugApi:
                 device_name=device_status.get("DeviceName", ""),
                 serial_number=device_status.get("Serial", ""),
                 api_version=ai_api_version,
+                ai_fw_version=ai_firmware,
             )
 
     async def aggregate_config(self) -> AggConfig:

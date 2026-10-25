@@ -299,8 +299,8 @@ class Shared:
                 configuration_url=str(self.client.base_url),
                 identifiers={(DOMAIN, self.meta.serial_number)},
                 name=self.meta.create_name(),
-                hw_version=self.update_coord.data.ai_fw_version.get("HW"),
-                sw_version=self.update_coord.data.ai_fw_version.get("SW"),
+                hw_version=self.meta.ai_fw_version.get("HW"),
+                sw_version=self.meta.ai_fw_version.get("SW"),
                 connections={(dr.CONNECTION_NETWORK_MAC, mac_addr)},
                 model=self.meta.model_name,
             )
