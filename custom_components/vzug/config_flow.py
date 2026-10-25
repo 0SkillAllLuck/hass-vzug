@@ -48,10 +48,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._base_url: URL | None = None
         self._username: str | None = None
         self._password: str | None = None
-        self._client: api.VZugApi | None = None
         self._meta: api.AggMeta | None = None
 
-    def _set_client(self) -> None:
+    async def _fetch_meta(self) -> api.AggMeta:
         assert self._base_url
         if self._username is not None and self._password is not None:
             credentials = api.Credentials(
@@ -60,10 +59,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         else:
             credentials = None
 
-        self._client = api.VZugApi(
+        client = api.VZugApi(
             self._base_url,
             credentials=credentials,
         )
+        try:
+            return await client.aggregate_meta()
+        finally:
+            # a new client for every attempt, closed right away: a flow can wait at a
+            # form for days (a discovery nobody confirmed), or be abandoned there
+            await client.aclose()
 
     # entry points
 
@@ -159,11 +164,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _check_device(
         self, *, needs_confirmation: bool, errors: dict[str, str]
     ) -> FlowResult | None:
-        self._set_client()
-        assert self._client
-
         try:
-            self._meta = await self._client.aggregate_meta()
+            self._meta = await self._fetch_meta()
         except api.AuthenticationFailed:
             return await self.async_step_auth()
         except Exception:
@@ -183,10 +185,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._username = user_input[CONF_USERNAME]
             self._password = user_input[CONF_PASSWORD]
-            self._set_client()
-            assert self._client
             try:
-                self._meta = await self._client.aggregate_meta()
+                self._meta = await self._fetch_meta()
             except api.AuthenticationFailed:
                 errors[CONF_BASE] = ERR_AUTH_FAILED
             except Exception:
