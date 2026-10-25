@@ -157,13 +157,14 @@ async def test_manual_aborts_for_configured_appliance():
 
 
 @pytest.mark.asyncio
-async def test_discovery_creates_entry_after_confirmation():
+async def test_discovery_asks_for_confirmation_only():
     flow = _flow("discovery")
     with _appliance(_meta()):
         result = await _step(
             flow.async_step_discovery(api.discovery.DiscoveryInfo(host="192.0.2.1"))
         )
     assert result["step_id"] == "confirm"
+    assert flow.context["confirm_only"] is True
 
     result = await _step(flow.async_step_confirm({}))
     assert result["type"] is FlowResultType.CREATE_ENTRY
