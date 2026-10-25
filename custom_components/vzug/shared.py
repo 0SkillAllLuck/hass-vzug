@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import logging
 from datetime import UTC, datetime, timedelta
 
@@ -344,6 +345,16 @@ class Shared:
         )
 
         self._first_refresh_done = True
+
+    @functools.cached_property
+    def device_id(self) -> str:
+        """The appliance's id in the device registry, the parent of its zones."""
+        # a child device needs its parent registered first, the entities on the
+        # appliance itself may not have been added yet
+        device = dr.async_get(self.hass).async_get_or_create(
+            config_entry_id=self.entry.entry_id, **self.device_info
+        )
+        return device.id
 
     async def _fetch_state(self) -> api.AggState:
         previous = self.state_coord.data
