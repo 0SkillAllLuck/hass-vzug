@@ -75,6 +75,19 @@
                 "name": "Send to appliance"
             }
         },
+        "event": {
+            "program": {
+                "name": "Program",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "program_started": "Program started",
+                            "program_finished": "Program finished"
+                        }
+                    }
+                }
+            }
+        },
         "sensor": {
             "energy_program": {
                 "name": "Energy Program"

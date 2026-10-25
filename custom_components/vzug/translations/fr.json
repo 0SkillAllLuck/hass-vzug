@@ -75,6 +75,19 @@
                 "name": "Envoyer à l'appareil"
             }
         },
+        "event": {
+            "program": {
+                "name": "Programme",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "program_started": "Programme démarré",
+                            "program_finished": "Programme terminé"
+                        }
+                    }
+                }
+            }
+        },
         "sensor": {
             "energy_program": {
                 "name": "Consommation électrique"
