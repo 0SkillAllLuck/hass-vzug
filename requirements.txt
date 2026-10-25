@@ -6,4 +6,4 @@ isort==6.0.1
 pytest==8.4.1
 pytest-asyncio==1.2.0
 pytest_socket==0.7.0
-json-repair==0.53.0
+json-repair==0.46.2
