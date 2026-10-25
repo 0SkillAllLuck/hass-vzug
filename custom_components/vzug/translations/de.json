@@ -2,9 +2,11 @@
   "config": {
     "abort": {
       "already_configured": "Gerät ist bereits konfiguriert",
-      "update_success": "Update Erfolgreich",
       "false_discovery": "Falsch positive Entdeckung",
-      "discovery_finished": "{count} Gerät(e) entdeckt"
+      "discovery_finished": "{count} Gerät(e) entdeckt",
+      "reauth_successful": "Erneute Authentifizierung erfolgreich",
+      "reconfigure_successful": "Neukonfiguration erfolgreich",
+      "unique_id_mismatch": "Das ist ein anderes Gerät als das eingerichtete"
     },
     "error": {
       "auth_failed": "Authentifizierung fehlgeschlagen",
@@ -26,12 +28,26 @@
           "host": "Die IP-Adresse, der Host oder die Basis-URL des Geräts"
         }
       },
+      "reconfigure": {
+        "title": "Neu konfigurieren",
+        "description": "Ändere die Adresse des Geräts.",
+        "data": {
+          "host": "Host"
+        },
+        "data_description": {
+          "host": "Die IP-Adresse, der Host oder die Basis-URL des Geräts"
+        }
+      },
       "auth": {
         "title": "Authentifizierung",
         "description": "Dein Gerät ist passwortgeschützt. Bitte gib die Anmeldedaten ein.",
         "data": {
           "username": "Nutzername",
           "password": "Passwort"
+        },
+        "data_description": {
+          "username": "Der Nutzername für die Anmeldung am Gerät",
+          "password": "Das Passwort für die Anmeldung am Gerät"
         }
       },
       "confirm": {

@@ -2,9 +2,11 @@
     "config": {
         "abort": {
             "already_configured": "Le périphérique est déjà configuré",
-            "update_success": "Mise à jour réussie",
             "false_discovery": "Découverte fausse positive",
-            "discovery_finished": "{count} appareil(s) découvert(s)"
+            "discovery_finished": "{count} appareil(s) découvert(s)",
+            "reauth_successful": "Réauthentification réussie",
+            "reconfigure_successful": "Reconfiguration réussie",
+            "unique_id_mismatch": "Ce n'est pas l'appareil qui a été configuré"
         },
         "error": {
             "auth_failed": "Échec de l'authentification",
@@ -26,12 +28,26 @@
                     "host": "L'adresse IP, l'hôte ou l'URL de base de l'appareil"
                 }
             },
+            "reconfigure": {
+                "title": "Reconfigurer",
+                "description": "Change l'adresse de l'appareil.",
+                "data": {
+                    "host": "Nom d'hôte"
+                },
+                "data_description": {
+                    "host": "L'adresse IP, l'hôte ou l'URL de base de l'appareil"
+                }
+            },
             "auth": {
                 "title": "Authentification",
                 "description": "Ton appareil est protégé par un mot de passe. Mets les infos d'identification ici.",
                 "data": {
                     "username": "Nom d'utilisateur",
                     "password": "Mot de passe"
+                },
+                "data_description": {
+                    "username": "Le nom d'utilisateur pour se connecter à l'appareil",
+                    "password": "Le mot de passe pour se connecter à l'appareil"
                 }
             },
             "confirm": {

@@ -13,6 +13,9 @@
   "dhcp": [
     {
       "macaddress": "FC1BFF*"
+    },
+    {
+      "registered_devices": true
     }
   ],
   "documentation": "https://github.com/siku2/hass-vzug",

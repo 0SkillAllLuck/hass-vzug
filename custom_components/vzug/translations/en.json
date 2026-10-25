@@ -2,9 +2,11 @@
     "config": {
         "abort": {
             "already_configured": "Device is already configured",
-            "update_success": "Update successful",
             "false_discovery": "False-positive Discovery",
-            "discovery_finished": "Discovered {count} device(s)"
+            "discovery_finished": "Discovered {count} device(s)",
+            "reauth_successful": "Re-authentication was successful",
+            "reconfigure_successful": "Reconfiguration was successful",
+            "unique_id_mismatch": "This is a different appliance than the one that was set up"
         },
         "error": {
             "auth_failed": "Authentication failed",
@@ -26,12 +28,26 @@
                     "host": "The IP address, host, or base url of the device"
                 }
             },
+            "reconfigure": {
+                "title": "Reconfigure",
+                "description": "Change the address of the appliance.",
+                "data": {
+                    "host": "Host"
+                },
+                "data_description": {
+                    "host": "The IP address, host, or base url of the device"
+                }
+            },
             "auth": {
                 "title": "Authentication",
                 "description": "Your device is password protected. Please provide the credentials here.",
                 "data": {
                     "username": "Username",
                     "password": "Password"
+                },
+                "data_description": {
+                    "username": "The username to log in to the appliance",
+                    "password": "The password to log in to the appliance"
                 }
             },
             "confirm": {
