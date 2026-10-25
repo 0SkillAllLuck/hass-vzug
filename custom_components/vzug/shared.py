@@ -367,6 +367,12 @@ class Shared:
     async def _fetch_state(self) -> api.AggState:
         previous = self.state_coord.data
         probe = self._device_probe_due()
+        device_status = None
+        if not self._first_refresh_done:
+            # 'aggregate_meta' asked for it moments ago, and on real appliances every
+            # request adds over half a second to the setup. Taken rather than copied,
+            # in the meta it would only go stale.
+            device_status, self.meta.device_status = self.meta.device_status, None
 
         try:
             async with detect_auth_failed():
@@ -374,6 +380,7 @@ class Shared:
                     default_on_error=self._first_refresh_done,
                     include_device=probe,
                     include_eco=probe,
+                    device_status=device_status,
                 )
 
                 if self._note_notifications(state.notifications) and not probe:
@@ -499,6 +506,8 @@ class Shared:
                 data = await self.client.aggregate_update_status(
                     supports_update_status=self.meta.supports_update_status(),
                     default_on_error=True,  # we allow the update to fail because it's not essential
+                    # the first time, the firmware 'aggregate_meta' fetched is still fresh
+                    ai_fw_version=self.meta.ai_fw_version if previous is None else None,
                 )
         except api.NO_ANSWER as exc:
             if previous is not None and not self._update_window_open():

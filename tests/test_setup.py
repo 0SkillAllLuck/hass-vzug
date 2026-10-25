@@ -14,6 +14,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from custom_components.vzug import async_setup_entry, async_unload_entry
+from custom_components.vzug.api import VZugApi
 from custom_components.vzug.const import CONF_BASE_URL
 from custom_components.vzug.shared import UNREACHABLE_RETRY_AFTER, Shared
 
@@ -177,9 +178,8 @@ async def test_setup_only_waits_for_meta_and_state(device):
             "getModelDescription",
             "getFWVersion",
             "getDeviceInfo",
-            # state
+            # state, its 'getDeviceStatus' is the one meta fetched
             "getZHMode",
-            "getDeviceStatus",
             "getLastPUSHNotifications",
             "getEcoInfo",
             # which coordinator the zone or program entities listen to
@@ -188,6 +188,54 @@ async def test_setup_only_waits_for_meta_and_state(device):
         assert set(_coordinators(setup)) == {"state"}
         # from the firmware 'aggregate_meta' fetched anyway
         assert setup.shared.device_info["sw_version"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("device", [DISHWASHER, WASHER, OVEN])
+async def test_first_state_reuses_the_device_status_meta_fetched(device):
+    passed = []
+    aggregate_state = VZugApi.aggregate_state
+
+    async def recording_state(self, **kwargs):
+        passed.append(kwargs.get("device_status"))
+        return await aggregate_state(self, **kwargs)
+
+    with (
+        Setup(device) as setup,
+        patch.object(VZugApi, "aggregate_state", recording_state),
+    ):
+        await setup.setup()
+        shared = setup.shared
+        device_status, fetched_at = passed[0]
+        state = shared.state_coord.data
+
+        # ProgramEnd counts from the time the status was really fetched
+        assert state.device_fetched_at == fetched_at
+        assert state.device is device_status
+        # it would only go stale in the meta, and the diagnostics would show it
+        assert shared.meta.device_status is None
+
+        # the same as asking for everything again
+        fresh = await aggregate_state(shared.client, default_on_error=False)
+        fresh.device_fetched_at = fetched_at
+        assert state == fresh
+
+
+@pytest.mark.asyncio
+async def test_update_reuses_the_firmware_meta_fetched():
+    with Setup(DISHWASHER) as setup:
+        await setup.setup()
+        await setup.run_background()
+
+        # the AI module's in meta, the hh module's in the update
+        assert setup.appliance.requests.count("getFWVersion") == 2
+        assert setup.shared.update_coord.data.ai_fw_version == (
+            setup.shared.meta.ai_fw_version
+        )
+
+        await setup.shared.update_coord.async_refresh()
+        # from then on it is asked for again
+        assert setup.appliance.requests.count("getFWVersion") == 4
 
 
 @pytest.mark.asyncio
