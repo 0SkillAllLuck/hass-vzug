@@ -8,6 +8,7 @@ from . import api, zones
 from .helpers import (
     UserConfigEntity,
     ZoneEntity,
+    action_errors,
     add_entities_as_they_appear,
     add_entities_when_ready,
     snake,
@@ -123,7 +124,10 @@ class Mode(ZoneEntity, SwitchEntity):
         await self._set(False)
 
     async def _set(self, on: bool) -> None:
-        await self.shared.client.set_cmd_value(self.vzug_key, "true" if on else "false")
+        async with action_errors(self.shared):
+            await self.shared.client.set_cmd_value(
+                self.vzug_key, "true" if on else "false"
+            )
         await self.coordinator.async_request_refresh()
 
 
@@ -146,7 +150,8 @@ class UserConfig(SwitchEntity, UserConfigEntity):
         await self._vzug_set_state(False)
 
     async def _vzug_set_state(self, on: bool) -> None:
-        await self.shared.client.set_command(
-            self.vzug_command_key, "true" if on else "false"
-        )
+        async with action_errors(self.shared):
+            await self.shared.client.set_command(
+                self.vzug_command_key, "true" if on else "false"
+            )
         await self.coordinator.async_request_refresh()

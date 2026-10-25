@@ -6,11 +6,13 @@ from homeassistant.components.update import (
     UpdateEntityFeature,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import api
-from .helpers import add_entities_when_ready
+from .const import DOMAIN
+from .helpers import action_errors, add_entities_when_ready
 from .shared import Shared, UpdateCoordinator, VZugConfigEntry
 
 # the appliance handles one request at a time, see 'api.VZugApi.__init__'
@@ -91,11 +93,17 @@ class VZugUpdate(UpdateEntity, CoordinatorEntity[UpdateCoordinator]):
             return
 
         if name == "AI":
-            await self.shared.client.do_ai_update()
+            install = self.shared.client.do_ai_update
         elif name == "HHG":
-            await self.shared.client.do_hhg_update()
+            install = self.shared.client.do_hhg_update
         else:
-            raise ValueError("unknown update component", name)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_update_component",
+                translation_placeholders={"name": name},
+            )
+        async with action_errors(self.shared):
+            await install()
         # the status may still read 'idle' right after the request, which would
         # put the coordinator back on its idle interval before the run even starts
         self.shared.note_update_activity()

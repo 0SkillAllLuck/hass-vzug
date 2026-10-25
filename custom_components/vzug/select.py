@@ -1,11 +1,14 @@
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import api, zones
+from .const import DOMAIN
 from .helpers import (
     UserConfigEntity,
+    action_errors,
     add_entities_as_they_appear,
     add_entities_when_ready,
     user_config_commands,
@@ -86,8 +89,13 @@ class ProgramSelect(CoordinatorEntity[ProgramCoordinator], SelectEntity):
     async def async_select_option(self, option: str) -> None:
         program_id = zones.program_id_by_key(self.coordinator.data.names, option)
         if program_id is None:
-            raise ValueError(f"unknown program {option!r}")
-        await self.shared.client.set_program(program_id)
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_program",
+                translation_placeholders={"option": option},
+            )
+        async with action_errors(self.shared):
+            await self.shared.client.set_program(program_id)
         await self.coordinator.async_request_refresh()
 
 
@@ -101,5 +109,6 @@ class UserConfig(SelectEntity, UserConfigEntity):
         return self.vzug_command.get("options", [])
 
     async def async_select_option(self, option: str) -> None:
-        await self.shared.client.set_command(self.vzug_command_key, option)
+        async with action_errors(self.shared):
+            await self.shared.client.set_command(self.vzug_command_key, option)
         await self.coordinator.async_request_refresh()

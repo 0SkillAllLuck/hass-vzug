@@ -171,5 +171,25 @@
                 }
             }
         }
+    },
+    "exceptions": {
+        "auth_failed": {
+            "message": "L'appareil a refusé les identifiants. Saisis-les à nouveau."
+        },
+        "no_answer": {
+            "message": "L'appareil ne répond pas. Vérifie qu'il est allumé et connecté au réseau."
+        },
+        "request_failed": {
+            "message": "L'appareil a refusé la demande ou a répondu de façon inattendue. Il est peut-être occupé, réessaie dans un instant."
+        },
+        "no_program_selected": {
+            "message": "Sélectionne d'abord un programme."
+        },
+        "unknown_program": {
+            "message": "Programme inconnu : {option}"
+        },
+        "unknown_update_component": {
+            "message": "L'appareil propose une mise à jour pour {name}, que cette intégration ne sait pas installer."
+        }
     }
 }

@@ -171,5 +171,25 @@
                 }
             }
         }
+    },
+    "exceptions": {
+        "auth_failed": {
+            "message": "The appliance rejected the credentials. Please enter them again."
+        },
+        "no_answer": {
+            "message": "The appliance didn't answer. Check that it is switched on and connected to the network."
+        },
+        "request_failed": {
+            "message": "The appliance refused the request or answered with something unexpected. It may be busy, try again in a moment."
+        },
+        "no_program_selected": {
+            "message": "Select a program first."
+        },
+        "unknown_program": {
+            "message": "Unknown program: {option}"
+        },
+        "unknown_update_component": {
+            "message": "The appliance offers an update for {name}, which this integration can't install."
+        }
     }
 }

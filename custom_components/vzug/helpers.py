@@ -1,8 +1,11 @@
-from collections.abc import Callable, Hashable, Iterable, Iterator
+import contextlib
+from collections.abc import AsyncIterator, Callable, Hashable, Iterable, Iterator
 
+import httpx
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import UndefinedType
@@ -12,7 +15,34 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from . import api, zones
+from .const import DOMAIN
 from .shared import ConfigCoordinator, Shared, ZoneCoordinator
+
+
+@contextlib.asynccontextmanager
+async def action_errors(shared: Shared) -> AsyncIterator[None]:
+    """Turn a failed request of an entity action into an error the user can read.
+
+    Without this the UI only shows "Unknown error".
+    """
+    try:
+        yield
+    except api.AuthenticationFailed as err:
+        # the coordinators would only notice on their next poll, and the user
+        # wants to know how to fix this now. HA ignores a second reauth request.
+        shared.entry.async_start_reauth(shared.hass)
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="auth_failed"
+        ) from err
+    except api.NO_ANSWER as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="no_answer"
+        ) from err
+    except (httpx.HTTPError, AssertionError, ValueError) as err:
+        # it answered, but refused the request or sent something unusable
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="request_failed"
+        ) from err
 
 
 def add_entities_as_they_appear[T, K: Hashable, V](
@@ -154,7 +184,10 @@ class ZoneEntity(CoordinatorEntity[ZoneCoordinator]):
         return super().available and (not self.vzug_zone or self.zone_data is not None)
 
     async def _write_zone(self, value: str) -> None:
-        await self.shared.client.set_zone_value(self.vzug_zone, self.vzug_key, value)
+        async with action_errors(self.shared):
+            await self.shared.client.set_zone_value(
+                self.vzug_zone, self.vzug_key, value
+            )
         await self.coordinator.async_request_refresh()
 
 
