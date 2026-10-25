@@ -210,6 +210,11 @@ class UserConfig(NumberEntity, UserConfigEntity):
         return 1.0
 
     @property
+    def native_unit_of_measurement(self) -> str | None:
+        # the appliance has it in its name, "Delayed start [h]"
+        return UnitOfTime.HOURS if self.translation_key == "delayed_start" else None
+
+    @property
     def native_value(self) -> float | None:
         value = self.vzug_command.get("value")
         if not value:

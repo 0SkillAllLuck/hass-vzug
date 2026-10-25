@@ -73,6 +73,12 @@
       },
       "send_program": {
         "name": "An Gerät senden"
+      },
+      "reset_total_consumption": {
+        "name": "Gesamtverbrauch zurücksetzen"
+      },
+      "reset_average_per_cycle": {
+        "name": "Durchschnitt pro Charge zurücksetzen"
       }
     },
     "event": {
@@ -141,6 +147,30 @@
           "on": "Ein",
           "off": "Aus"
         }
+      },
+      "last_program_energy": {
+        "name": "Energieverbrauch letztes Programm"
+      },
+      "last_program_water": {
+        "name": "Wasserverbrauch letztes Programm"
+      },
+      "average_energy": {
+        "name": "Durchschnittlicher Energieverbrauch"
+      },
+      "average_water": {
+        "name": "Durchschnittlicher Wasserverbrauch"
+      },
+      "total_energy": {
+        "name": "Gesamter Energieverbrauch"
+      },
+      "total_water": {
+        "name": "Gesamter Wasserverbrauch"
+      },
+      "total_consumption": {
+        "name": "Gesamtverbrauch"
+      },
+      "average_per_cycle": {
+        "name": "Durchschnitt pro Charge"
       }
     },
     "update": {
@@ -168,6 +198,15 @@
       },
       "timer": {
         "name": "Timer"
+      },
+      "delayed_start": {
+        "name": "Startaufschub"
+      },
+      "brightness": {
+        "name": "Helligkeit"
+      },
+      "dryness_level": {
+        "name": "Trockengrad"
       }
     },
     "switch": {
@@ -185,6 +224,69 @@
       },
       "silent_plus_mode": {
         "name": "SilentPlus"
+      },
+      "energy_saving": {
+        "name": "Energiesparen"
+      },
+      "partial_load": {
+        "name": "Teilbeladung"
+      },
+      "rinse_plus": {
+        "name": "SpülenPlus"
+      },
+      "dry_plus": {
+        "name": "TrocknenPlus"
+      },
+      "steam_finish": {
+        "name": "SteamFinish"
+      },
+      "opti_start": {
+        "name": "OptiStart"
+      },
+      "all_in_one": {
+        "name": "All in 1"
+      },
+      "child_lock": {
+        "name": "Kindersicherung"
+      },
+      "auto_door_opener": {
+        "name": "Türöffnungsautomatik"
+      },
+      "door_angle_control": {
+        "name": "Bedienung bei Türwinkel 46-90°"
+      },
+      "auto_standby": {
+        "name": "Standby-Automatik"
+      },
+      "empty_tank_on_power_failure": {
+        "name": "Tank bei Stromausfall leeren"
+      },
+      "eco_management": {
+        "name": "EcoManagement"
+      },
+      "background_image": {
+        "name": "Hintergrundbild"
+      },
+      "button_tone": {
+        "name": "Tastenton"
+      },
+      "drum_light": {
+        "name": "Trommelbeleuchtung"
+      },
+      "hygiene_info": {
+        "name": "Hygieneinfo"
+      },
+      "soft_water": {
+        "name": "Weichwasser"
+      },
+      "multi_component_detergent": {
+        "name": "Baukastenwaschmittel"
+      },
+      "silent": {
+        "name": "Silent"
+      },
+      "reverse_plus": {
+        "name": "ReversierenPlus"
       }
     },
     "select": {
@@ -200,6 +302,60 @@
           "hygiene": "Hygiene",
           "pre_rinsing": "Vorspülen"
         }
+      },
+      "button_tone": {
+        "name": "Tastenton"
+      },
+      "signal_tone": {
+        "name": "Signalton"
+      },
+      "rinse_aid": {
+        "name": "Glanzmittel"
+      },
+      "water_hardness_unit": {
+        "name": "Wasserhärteeinheit"
+      },
+      "water_hardness": {
+        "name": "Wasserhärte"
+      },
+      "temperature_unit": {
+        "name": "Temperatureinheit"
+      },
+      "interior_lighting": {
+        "name": "Innenraumbeleuchtung"
+      },
+      "function_light": {
+        "name": "FunctionLight"
+      },
+      "storage_tank": {
+        "name": "Speichertank"
+      },
+      "hot_water_connection": {
+        "name": "Warmwasseranschluss"
+      },
+      "spin_speed": {
+        "name": "Schleudern"
+      },
+      "delayed_start_time": {
+        "name": "Startaufschub Uhrzeit"
+      },
+      "aqua_plus": {
+        "name": "AquaPlus"
+      },
+      "soiling": {
+        "name": "Verschmutzung"
+      },
+      "anti_crease": {
+        "name": "Auflockern"
+      },
+      "eco_hybrid": {
+        "name": "eHybrid"
+      },
+      "default_mode": {
+        "name": "Standardmodus"
+      },
+      "viewing_angle": {
+        "name": "Blickwinkel"
       }
     }
   },
