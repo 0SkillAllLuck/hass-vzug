@@ -21,6 +21,10 @@ _LOGGER = logging.getLogger(__name__)
 # error is not enough to write the command off.
 ZH_MODE_WARMUP_MAX_FAILURES = 3
 
+# nothing answered in time: the appliance is switched off or out of reach. A busy
+# one answers quickly with 503, 400.03 or '200 []' instead.
+NO_ANSWER = (httpx.ConnectError, httpx.TimeoutException)
+
 DeviceStatusInactiveT = Literal["true"] | Literal["false"]
 
 
@@ -391,14 +395,13 @@ class VZugApi:
 
                 last_exc = err
                 _LOGGER.debug("server error: %s", err.response)
-            except (httpx.ConnectError, httpx.TimeoutException) as err:
-                # Nothing answered in time: the appliance is switched off or out of
-                # reach. A busy one answers quickly with 503, 400.03 or '200 []'
-                # instead, which is retried. Another attempt would only keep the
-                # single connection, and every other request to this appliance, waiting.
-                last_exc = err
+            except NO_ANSWER as err:
+                # Another attempt would only keep the single connection, and every
+                # other request to this appliance, waiting. 'value_on_err' is for a
+                # bad answer, not for none at all: the caller has to learn that the
+                # appliance is gone, so it can make its entities unavailable.
                 _LOGGER.debug("no answer, not retrying: %r", err)
-                break
+                raise
             except httpx.TransportError as err:
                 last_exc = err
                 _LOGGER.debug("transport error: %r", err)
@@ -412,7 +415,8 @@ class VZugApi:
             attempt_idx += 1
 
         if value_on_err:
-            _LOGGER.exception("command error, using default", exc_info=last_exc)
+            # the appliance is there, it just didn't like this one command
+            _LOGGER.debug("%s failed, using default: %r", command, last_exc)
             return value_on_err()
 
         raise last_exc
@@ -442,6 +446,10 @@ class VZugApi:
             # after it has failed several times in a row.
             try:
                 zh_mode = await self.get_zh_mode(attempts=1)
+            except NO_ANSWER:
+                # says nothing about the command, and the rest of the poll would
+                # only wait for the same appliance
+                raise
             except Exception as exc:
                 self._zh_mode_warmup_failures += 1
                 _LOGGER.debug(

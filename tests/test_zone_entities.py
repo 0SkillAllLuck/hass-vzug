@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.vzug import zones
 from custom_components.vzug.binary_sensor import Door
@@ -219,10 +220,23 @@ async def test_setup_zones_probes_the_modes(bare_shared, monkeypatch):
 async def test_fetch_zones_keeps_previous_data_for_a_while(bare_shared):
     previous = zones.ZoneState(zones=zones.index_zones(COMBI_COOLER), modes={})
     bare_shared.zone_coord = MagicMock(data=previous)
-    bare_shared.client.get_raw_programs = AsyncMock(side_effect=httpx.ReadTimeout("x"))
+    bare_shared.client.get_raw_programs = AsyncMock(
+        side_effect=ValueError("device returned an error response")
+    )
     for _ in range(3):
         assert await bare_shared._fetch_zones() is previous
-    with pytest.raises(Exception):
+    with pytest.raises(UpdateFailed):
+        await bare_shared._fetch_zones()
+
+
+@pytest.mark.asyncio
+async def test_fetch_zones_unavailable_without_an_answer(bare_shared):
+    """The grace period is for a busy appliance, not for one that is gone."""
+    previous = zones.ZoneState(zones=zones.index_zones(COMBI_COOLER), modes={})
+    bare_shared.zone_coord = MagicMock(data=previous)
+    bare_shared.client.get_raw_programs = AsyncMock(side_effect=httpx.ConnectError(""))
+
+    with pytest.raises(UpdateFailed):
         await bare_shared._fetch_zones()
 
 
@@ -267,6 +281,16 @@ async def test_setup_programs_learns_the_names(bare_shared, monkeypatch):
     )
     state = await bare_shared._fetch_programs()
     assert state.current["id"] == 50
+
+    # a bad answer keeps what we had, no answer at all makes it unavailable
+    coordinator.data = state
+    bare_shared.client.get_raw_programs = AsyncMock(side_effect=ValueError("busy"))
+    assert await bare_shared._fetch_programs() is state
+    bare_shared.client.get_raw_programs = AsyncMock(
+        side_effect=httpx.ConnectTimeout("")
+    )
+    with pytest.raises(UpdateFailed):
+        await bare_shared._fetch_programs()
 
 
 @pytest.mark.asyncio
