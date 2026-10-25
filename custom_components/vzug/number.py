@@ -20,6 +20,9 @@ from .helpers import (
 )
 from .shared import Shared, VZugConfigEntry
 
+# the appliance handles one request at a time, see 'api.VZugApi.__init__'
+PARALLEL_UPDATES = 1
+
 # what the V-ZUG app offers first when a timed function is switched on
 DEFAULT_BOOST_HOURS = 12.0
 

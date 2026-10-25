@@ -27,6 +27,9 @@ from .helpers import (
 )
 from .shared import Shared, StateCoordinator, VZugConfigEntry
 
+# read-only, the coordinators do all the talking to the appliance
+PARALLEL_UPDATES = 0
+
 # https://developers.home-assistant.io/docs/core/entity/sensor/
 
 _ECO_SENSORS: list[SensorEntityDescription] = [

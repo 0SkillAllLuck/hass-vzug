@@ -13,6 +13,9 @@ from . import api
 from .helpers import add_entities_when_ready
 from .shared import Shared, UpdateCoordinator, VZugConfigEntry
 
+# the appliance handles one request at a time, see 'api.VZugApi.__init__'
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

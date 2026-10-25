@@ -15,6 +15,9 @@ from .helpers import (
 )
 from .shared import Shared, VZugConfigEntry
 
+# the appliance handles one request at a time, see 'api.VZugApi.__init__'
+PARALLEL_UPDATES = 1
+
 _ICONS = {
     "superCool": "mdi:snowflake-thermometer",
     "superFreeze": "mdi:snowflake-alert",

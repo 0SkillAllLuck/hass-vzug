@@ -9,6 +9,9 @@ from . import zones
 from .helpers import ZoneEntity, add_entities_when_ready, zone_translation
 from .shared import Shared, VZugConfigEntry
 
+# read-only, the coordinators do all the talking to the appliance
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
