@@ -1,0 +1,46 @@
+name: "Tests"
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+
+jobs:
+  pytest:
+    name: "Pytest (HA ${{ matrix.homeassistant }})"
+    runs-on: "ubuntu-latest"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The minimum, pinned in requirements.txt to match hacs.json
+          - homeassistant: "minimum"
+            python-version: "3.13"
+            # aiodns 3.4.0, pinned by HA 2025.6, breaks with pycares 5
+            extra: "pycares<5"
+          # The latest stable release, so new HA releases show up here first
+          - homeassistant: "latest"
+            python-version: "3.14"
+            extra: "homeassistant"
+    steps:
+      - name: "Checkout the repository"
+        uses: "actions/checkout@v6"
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: "Install requirements"
+        shell: bash
+        run: |
+          if [ "${{ matrix.homeassistant }}" = "latest" ]; then
+            sed -i '/^homeassistant==/d' requirements.txt
+          fi
+          python3 -m pip install -r requirements.txt "${{ matrix.extra }}"
+          python3 -m pip show homeassistant | grep '^Version'
+
+      - name: "Run"
+        run: python3 -m pytest tests --ignore=tests/integration
