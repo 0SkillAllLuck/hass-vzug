@@ -113,7 +113,7 @@ class Setup:
     def shared(self) -> Shared:
         return self.entry.runtime_data
 
-    def __enter__(self) -> "Setup":
+    def __enter__(self) -> Setup:
         self.hass.loop = asyncio.get_running_loop()
         self._patches = [
             patch.object(httpx.AsyncClient, "get", self.appliance.get),
