@@ -381,7 +381,7 @@
       "message": "Das Gerät antwortet nicht. Prüfe, ob es eingeschaltet und mit dem Netzwerk verbunden ist."
     },
     "request_failed": {
-      "message": "Das Gerät hat die Anfrage abgelehnt oder unerwartet geantwortet. Vielleicht ist es gerade beschäftigt, versuch es gleich nochmal."
+      "message": "Das Gerät hat die Anfrage abgelehnt, unerwartet oder zu spät geantwortet. Vielleicht ist es gerade beschäftigt, versuch es gleich nochmal."
     },
     "no_program_selected": {
       "message": "Wähle zuerst ein Programm aus."

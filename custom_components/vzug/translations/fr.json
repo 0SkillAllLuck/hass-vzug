@@ -381,7 +381,7 @@
             "message": "L'appareil ne répond pas. Vérifie qu'il est allumé et connecté au réseau."
         },
         "request_failed": {
-            "message": "L'appareil a refusé la demande ou a répondu de façon inattendue. Il est peut-être occupé, réessaie dans un instant."
+            "message": "L'appareil a refusé la demande, a répondu de façon inattendue ou a mis trop de temps à répondre. Il est peut-être occupé, réessaie dans un instant."
         },
         "no_program_selected": {
             "message": "Sélectionne d'abord un programme."

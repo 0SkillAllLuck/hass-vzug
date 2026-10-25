@@ -483,13 +483,12 @@ async def test_failed_requests_do_not_extend_the_window(shared):
 
 
 @pytest.mark.asyncio
-async def test_unreachable_appliance_makes_the_state_unavailable(shared):
+@pytest.mark.parametrize("error", [httpx.ConnectError(""), httpx.ConnectTimeout("")])
+async def test_unreachable_appliance_makes_the_state_unavailable(shared, error):
     """No answer must not become empty data: 'Program' would read 'active'."""
     shared.client = VZugApi(base_url="http://example.com")
     with (
-        patch.object(
-            shared.client._client, "get", side_effect=httpx.ConnectTimeout("")
-        ) as get,
+        patch.object(shared.client._client, "get", side_effect=error) as get,
         pytest.raises(UpdateFailed),
     ):
         await shared._fetch_state()
@@ -522,6 +521,59 @@ async def test_a_failing_hh_command_still_degrades_gracefully(shared):
 
     assert state.device == {"Inactive": "true", "Program": ""}
     assert state.eco_info == {}
+
+
+_AWAKE = {
+    "getZHMode": {"value": 2},
+    "getDeviceStatus": {"Inactive": "true", "Program": ""},
+    "getLastPUSHNotifications": [],
+    "getEcoInfo": _ECO_INFO,
+}
+
+
+async def _fetch_state_timing_out(shared: Shared, timeouts: dict[str, int]):
+    """A state poll where each command times out the given number of times first."""
+
+    async def get(url):
+        command = url.split("command=")[1].split("&")[0]
+        if timeouts.get(command, 0) > 0:
+            timeouts[command] -= 1
+            raise httpx.ReadTimeout("")
+        return _json_response(_AWAKE[command])
+
+    shared.client = VZugApi(base_url="http://example.com")
+    with (
+        patch.object(shared.client._client, "get", side_effect=get),
+        patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        return await shared._fetch_state()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("command", ["getZHMode", "getDeviceStatus"])
+async def test_waking_appliance_gets_a_second_chance(shared, command):
+    """Seen on an AdoraWash V2000: asleep, it misses the read timeout once."""
+    state = await _fetch_state_timing_out(shared, {command: 1})
+
+    assert state.zh_mode == 2
+    assert state.device == _AWAKE["getDeviceStatus"]
+    assert state.eco_info == _ECO_INFO
+
+
+@pytest.mark.asyncio
+async def test_slow_appliance_degrades_like_a_bad_answer(shared):
+    """It took the connection, so it is there: no reason to make it unavailable."""
+    state = await _fetch_state_timing_out(shared, dict.fromkeys(_AWAKE, 2))
+
+    assert state == AggState(
+        zh_mode=-1,
+        device={},
+        device_fetched_at=state.device_fetched_at,
+        notifications=[],
+        eco_info={},
+    )
+    # and it says nothing about whether the appliance knows 'getZHMode'
+    assert shared.client._zh_mode_warmup_failures == 0
 
 
 def _state_entity_shared(device) -> SimpleNamespace:

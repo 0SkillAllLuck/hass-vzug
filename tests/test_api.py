@@ -434,9 +434,9 @@ async def test_unreachable_appliance_is_tried_once(vzug_api):
 async def test_no_answer_is_not_covered_by_the_default(vzug_api):
     """The default is for a bad answer. Without any, the caller has to know."""
     with patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get:
-        mock_get.side_effect = httpx.ReadTimeout("")
+        mock_get.side_effect = httpx.ConnectTimeout("")
 
-        with pytest.raises(httpx.ReadTimeout):
+        with pytest.raises(httpx.ConnectTimeout):
             await vzug_api.get_eco_info(default_on_error=True)
 
 
@@ -474,9 +474,7 @@ async def test_zh_mode_warmup_does_not_count_no_answer(vzug_api):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "error", [httpx.ConnectError(""), httpx.ConnectTimeout(""), httpx.ReadTimeout("")]
-)
+@pytest.mark.parametrize("error", [httpx.ConnectError(""), httpx.ConnectTimeout("")])
 async def test_no_answer_is_not_retried(vzug_api, error):
     with (
         patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get,
@@ -488,6 +486,53 @@ async def test_no_answer_is_not_retried(vzug_api, error):
             await vzug_api.get_eco_info()
 
         assert mock_get.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_read_timeout_is_retried_once(vzug_api):
+    """A sleeping appliance can miss the read timeout while it wakes up."""
+    with (
+        patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get,
+        patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_get.side_effect = [httpx.ReadTimeout(""), _json_response({"value": 2})]
+
+        # even where the caller asked for a single attempt
+        assert await vzug_api.get_zh_mode(attempts=1) == 2
+        assert mock_get.call_count == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("attempts", [1, 5])
+async def test_read_timeout_is_not_retried_twice(vzug_api, attempts):
+    """Then it's a bad answer: the default if there is one, but not 'no answer'."""
+    with (
+        patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get,
+        patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_get.side_effect = httpx.ReadTimeout("")
+
+        assert (
+            await vzug_api.get_device_status(default_on_error=True, attempts=attempts)
+            == {}
+        )
+        assert mock_get.call_count == 2
+
+        with pytest.raises(httpx.ReadTimeout):
+            await vzug_api.get_device_status(attempts=attempts)
+
+
+@pytest.mark.asyncio
+async def test_read_timeout_then_no_connection_is_no_answer(vzug_api):
+    """Switched off with the connection still open: the retry finds out."""
+    with (
+        patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get,
+        patch("custom_components.vzug.api.asyncio.sleep", new_callable=AsyncMock),
+    ):
+        mock_get.side_effect = [httpx.ReadTimeout(""), httpx.ConnectError("")]
+
+        with pytest.raises(httpx.ConnectError):
+            await vzug_api.get_eco_info(default_on_error=True)
 
 
 @pytest.mark.asyncio
