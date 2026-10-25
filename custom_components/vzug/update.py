@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import api
 from .const import DOMAIN
+from .helpers import add_entities_when_ready
 from .shared import Shared, UpdateCoordinator
 
 
@@ -23,7 +24,12 @@ async def async_setup_entry(
     shared: Shared = hass.data[DOMAIN][config_entry.entry_id]
 
     if shared.meta.supports_update_status():
-        async_add_entities([VZugUpdate(shared)])
+        add_entities_when_ready(
+            config_entry,
+            shared.update_coord,
+            async_add_entities,
+            lambda: [VZugUpdate(shared)],
+        )
 
 
 class VZugUpdate(UpdateEntity, CoordinatorEntity[UpdateCoordinator]):

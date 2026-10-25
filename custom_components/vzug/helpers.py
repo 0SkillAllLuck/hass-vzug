@@ -50,6 +50,27 @@ def add_entities_as_they_appear[T, K: Hashable, V](
     config_entry.async_on_unload(coordinator.async_add_listener(_add_new))
 
 
+def add_entities_when_ready(
+    config_entry: ConfigEntry,
+    coordinator: DataUpdateCoordinator,
+    async_add_entities: AddEntitiesCallback,
+    build: Callable[[], Iterable[Entity]],
+) -> None:
+    """Add the entities 'build' returns once the coordinator has data.
+
+    For the coordinators whose first refresh 'Shared.async_refresh_the_rest' does,
+    after the setup: their entities read the data as soon as they exist. 'build' is
+    asked again on every update, new entities in its answer are added too.
+    """
+    add_entities_as_they_appear(
+        config_entry,
+        coordinator,
+        async_add_entities,
+        lambda _: ((entity.unique_id, entity) for entity in build()),
+        lambda _, entity: entity,
+    )
+
+
 def user_config_commands(
     config: api.AggConfig,
 ) -> Iterator[tuple[tuple[str, str], api.Command]]:
