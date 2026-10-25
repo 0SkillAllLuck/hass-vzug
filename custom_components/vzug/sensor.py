@@ -37,7 +37,6 @@ _ECO_SENSORS: list[SensorEntityDescription] = [
         "water.total",
         device_class=SensorDeviceClass.WATER,
         entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:water",
         native_unit_of_measurement="L",
         state_class=SensorStateClass.TOTAL,
         translation_key="water_total",
@@ -46,7 +45,6 @@ _ECO_SENSORS: list[SensorEntityDescription] = [
         "water.program",
         device_class=SensorDeviceClass.WATER,
         entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:water",
         native_unit_of_measurement="L",
         state_class=SensorStateClass.TOTAL_INCREASING,
         translation_key="water_program",
@@ -55,7 +53,6 @@ _ECO_SENSORS: list[SensorEntityDescription] = [
         "energy.total",
         device_class=SensorDeviceClass.ENERGY,
         entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:lightning-bolt",
         native_unit_of_measurement="kWh",
         state_class=SensorStateClass.TOTAL,
         translation_key="energy_total",
@@ -64,7 +61,6 @@ _ECO_SENSORS: list[SensorEntityDescription] = [
         "energy.program",
         device_class=SensorDeviceClass.ENERGY,
         entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:lightning-bolt",
         native_unit_of_measurement="kWh",
         state_class=SensorStateClass.TOTAL_INCREASING,
         translation_key="energy_program",
@@ -75,7 +71,6 @@ _ECO_SENSORS: list[SensorEntityDescription] = [
         # Therefore we do not set the device class here.
         "water.average",
         entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:water",
         native_unit_of_measurement="L",
         state_class=SensorStateClass.MEASUREMENT,
         translation_key="water_average",
@@ -86,7 +81,6 @@ _ECO_SENSORS: list[SensorEntityDescription] = [
         # Therefore we do not set the device class here.
         "energy.average",
         entity_category=EntityCategory.DIAGNOSTIC,
-        icon="mdi:lightning-bolt",
         native_unit_of_measurement="kWh",
         state_class=SensorStateClass.MEASUREMENT,
         translation_key="energy_average",
@@ -180,7 +174,6 @@ class TimeLeft(ZoneEntity, SensorEntity):
 
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
-    _attr_icon = "mdi:timer-sand"
 
     def __init__(self, shared: Shared, *, zone: str, key: str) -> None:
         super().__init__(shared, zone=zone, key=key)
@@ -245,6 +238,8 @@ class Program(StateBase):
 class ProgramEndRaw(StateBase):
     _attr_translation_key = "program_end_raw"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    # the appliance's text for 'program_end', which shows it as a timestamp
+    _attr_entity_registry_enabled_default = False
 
     @property
     def vzug_program_end(self) -> api.DeviceStatusProgramEnd:
@@ -268,6 +263,7 @@ _RE_END_DURATON = re.compile(r"(?P<hours>\d+)[h](?P<minutes>\d+)", re.IGNORECASE
 class ProgramEnd(ProgramEndRaw):
     _attr_translation_key = "program_end"
     _attr_entity_category = None
+    _attr_entity_registry_enabled_default = True
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(self, shared: Shared) -> None:
@@ -353,7 +349,6 @@ class Eco(StateBase):
 
 class LastNotification(StateBase):
     _attr_translation_key = "last_notification"
-    _attr_icon = "mdi:bell"
 
     @property
     def native_value(self) -> StateType | date | datetime | Decimal:

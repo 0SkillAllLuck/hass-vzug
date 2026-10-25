@@ -1,5 +1,15 @@
 {
     "entity": {
+        "button": {
+            "send_program": {
+                "default": "mdi:send"
+            }
+        },
+        "number": {
+            "timer": {
+                "default": "mdi:timer-outline"
+            }
+        },
         "select": {
             "program_select": {
                 "default": "mdi:dishwasher",
@@ -13,6 +23,55 @@
                     "hygiene": "mdi:shield-check-outline",
                     "pre_rinsing": "mdi:water-sync"
                 }
+            }
+        },
+        "sensor": {
+            "energy_average": {
+                "default": "mdi:lightning-bolt"
+            },
+            "energy_program": {
+                "default": "mdi:lightning-bolt"
+            },
+            "energy_total": {
+                "default": "mdi:lightning-bolt"
+            },
+            "last_notification": {
+                "default": "mdi:bell"
+            },
+            "time_left_party_cooling": {
+                "default": "mdi:timer-sand"
+            },
+            "time_left_super_cool": {
+                "default": "mdi:timer-sand"
+            },
+            "time_left_super_freeze": {
+                "default": "mdi:timer-sand"
+            },
+            "water_average": {
+                "default": "mdi:water"
+            },
+            "water_program": {
+                "default": "mdi:water"
+            },
+            "water_total": {
+                "default": "mdi:water"
+            }
+        },
+        "switch": {
+            "holiday_mode": {
+                "default": "mdi:beach"
+            },
+            "party_cooling": {
+                "default": "mdi:party-popper"
+            },
+            "silent_plus_mode": {
+                "default": "mdi:volume-off"
+            },
+            "super_cool": {
+                "default": "mdi:snowflake-thermometer"
+            },
+            "super_freeze": {
+                "default": "mdi:snowflake-alert"
             }
         }
     }

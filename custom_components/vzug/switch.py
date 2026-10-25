@@ -19,15 +19,6 @@ from .shared import Shared, VZugConfigEntry
 # the appliance handles one request at a time, see 'api.VZugApi.__init__'
 PARALLEL_UPDATES = 1
 
-_ICONS = {
-    "superCool": "mdi:snowflake-thermometer",
-    "superFreeze": "mdi:snowflake-alert",
-    "partyCooling": "mdi:party-popper",
-    "HolidayMode": "mdi:beach",
-    "SilentPlusMode": "mdi:volume-off",
-}
-
-
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: VZugConfigEntry,
@@ -82,10 +73,12 @@ class TimedFunction(ZoneEntity, SwitchEntity):
     switches it off by itself when that is over.
     """
 
+    # changes with every zone poll while running, the time left sensor has it too
+    _unrecorded_attributes = frozenset({"remaining_seconds"})
+
     def __init__(self, shared: Shared, *, zone: str, key: str) -> None:
         super().__init__(shared, zone=zone, key=key)
         self._attr_translation_key = snake(key)
-        self._attr_icon = _ICONS.get(key)
 
     @property
     def is_on(self) -> bool:
@@ -111,7 +104,6 @@ class Mode(ZoneEntity, SwitchEntity):
     def __init__(self, shared: Shared, *, mode: str) -> None:
         super().__init__(shared, zone="", key=mode)
         self._attr_translation_key = snake(mode)
-        self._attr_icon = _ICONS.get(mode)
 
     @property
     def is_on(self) -> bool | None:

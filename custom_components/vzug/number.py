@@ -172,7 +172,6 @@ class Timer(ZoneEntity, NumberEntity):
     _attr_native_min_value = 0.0
     _attr_native_step = 1.0
     _attr_mode = NumberMode.BOX
-    _attr_icon = "mdi:timer-outline"
 
     def __init__(self, shared: Shared, *, zone: str) -> None:
         super().__init__(shared, zone=zone, key=zones.TIMER_KEY)

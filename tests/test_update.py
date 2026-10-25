@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -5,6 +7,8 @@ from homeassistant.const import STATE_OFF, STATE_ON
 
 from custom_components.vzug.api import AggUpdateStatus
 from custom_components.vzug.update import VZugUpdate
+
+_FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _data(
@@ -177,3 +181,20 @@ def test_progress(component, in_progress, percentage):
     attributes = entity.state_attributes
     assert attributes["in_progress"] is in_progress
     assert attributes["update_percentage"] == percentage
+
+
+@pytest.mark.parametrize(
+    "fixture", sorted(_FIXTURES.glob("*/responses/*_get_fwversion.json"))
+)
+def test_firmware_attributes_are_not_recorded(fixture):
+    data = json.loads(fixture.read_text())
+    entity = _entity(
+        AggUpdateStatus(
+            update={},
+            ai_fw_version=data if fixture.name.startswith("ai_") else {},
+            hh_fw_version=data if fixture.name.startswith("hh_") else {},
+        )
+    )
+
+    assert entity.extra_state_attributes
+    assert set(entity.extra_state_attributes) <= VZugUpdate._unrecorded_attributes

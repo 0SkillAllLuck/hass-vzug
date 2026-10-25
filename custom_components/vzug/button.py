@@ -64,7 +64,6 @@ class SendProgram(CoordinatorEntity[ProgramCoordinator], ButtonEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "send_program"
-    _attr_icon = "mdi:send"
 
     def __init__(self, shared: Shared) -> None:
         assert shared.program_coord is not None
