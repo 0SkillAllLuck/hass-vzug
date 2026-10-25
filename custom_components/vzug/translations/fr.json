@@ -300,7 +300,21 @@
                     "glass": "Verres",
                     "fondue_raclette": "Fondue/Raclette",
                     "hygiene": "Hygiène",
-                    "pre_rinsing": "Prélavage"
+                    "pre_rinsing": "Prélavage",
+                    "machine_care": "Entretien de l'appareil",
+                    "automatik": "Automatique",
+                    "party": "Party",
+                    "heissluft": "Air chaud",
+                    "heissluft_feucht": "Air chaud humide",
+                    "heissluft_eco": "Air chaud Eco",
+                    "pizzaplus": "PizzaPlus",
+                    "grill_umluft": "Gril avec ventilation",
+                    "grill": "Gril",
+                    "unterhitze": "Chaleur inférieure",
+                    "ober_unterhitze_eco": "Chaleur supérieure/inférieure Eco",
+                    "ober_unterhitze_feucht": "Chaleur supérieure/inférieure humide",
+                    "ober_unterhitze": "Chaleur supérieure/inférieure",
+                    "tellerwaermen_garraum": "Chauffe-assiettes dans l'enceinte de cuisson"
                 }
             },
             "button_tone": {

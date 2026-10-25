@@ -34,7 +34,14 @@
                     "glass": "mdi:glass-wine",
                     "fondue_raclette": "mdi:cheese",
                     "hygiene": "mdi:shield-check-outline",
-                    "pre_rinsing": "mdi:water-sync"
+                    "pre_rinsing": "mdi:water-sync",
+                    "machine_care": "mdi:wrench-outline",
+                    "automatik": "mdi:alpha-a-circle-outline",
+                    "party": "mdi:party-popper",
+                    "heissluft": "mdi:fan",
+                    "pizzaplus": "mdi:pizza",
+                    "grill_umluft": "mdi:grill",
+                    "grill": "mdi:grill"
                 }
             }
         },

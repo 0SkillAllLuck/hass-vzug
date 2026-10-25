@@ -300,7 +300,21 @@
           "glass": "Glas",
           "fondue_raclette": "Fondue/Raclette",
           "hygiene": "Hygiene",
-          "pre_rinsing": "Vorspülen"
+          "pre_rinsing": "Vorspülen",
+          "machine_care": "Maschinenpflege",
+          "automatik": "Automatik",
+          "party": "Party",
+          "heissluft": "Heissluft",
+          "heissluft_feucht": "Heissluft feucht",
+          "heissluft_eco": "Heissluft Eco",
+          "pizzaplus": "PizzaPlus",
+          "grill_umluft": "Grill-Umluft",
+          "grill": "Grill",
+          "unterhitze": "Unterhitze",
+          "ober_unterhitze_eco": "Ober-/Unterhitze Eco",
+          "ober_unterhitze_feucht": "Ober-/Unterhitze feucht",
+          "ober_unterhitze": "Ober-/Unterhitze",
+          "tellerwaermen_garraum": "Tellerwärmen Garraum"
         }
       },
       "button_tone": {

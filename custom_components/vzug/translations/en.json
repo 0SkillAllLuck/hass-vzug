@@ -300,7 +300,21 @@
                     "glass": "Glass",
                     "fondue_raclette": "Fondue/Raclette",
                     "hygiene": "Hygiene",
-                    "pre_rinsing": "Pre-rinsing"
+                    "pre_rinsing": "Pre-rinsing",
+                    "machine_care": "Machine care",
+                    "automatik": "Automatic",
+                    "party": "Party",
+                    "heissluft": "Hot air",
+                    "heissluft_feucht": "Hot air humid",
+                    "heissluft_eco": "Hot air Eco",
+                    "pizzaplus": "PizzaPlus",
+                    "grill_umluft": "Grill with fan",
+                    "grill": "Grill",
+                    "unterhitze": "Bottom heat",
+                    "ober_unterhitze_eco": "Top/bottom heat Eco",
+                    "ober_unterhitze_feucht": "Top/bottom heat humid",
+                    "ober_unterhitze": "Top/bottom heat",
+                    "tellerwaermen_garraum": "Plate warming in the cooking space"
                 }
             },
             "button_tone": {
