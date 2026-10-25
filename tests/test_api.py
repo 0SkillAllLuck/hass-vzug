@@ -8,6 +8,7 @@ from custom_components.vzug.api import (
     ZH_MODE_WARMUP_MAX_FAILURES,
     AggCategory,
     VZugApi,
+    is_unsupported,
 )
 
 def _json_response(payload):
@@ -535,3 +536,29 @@ async def test_aggregate_config_stops_at_the_first_failure(vzug_api):
             await vzug_api.aggregate_config()
 
         assert command.call_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("response", "unsupported"),
+    [
+        (_status_response(404), True),
+        (_json_response({"error": {"code": 404}}), True),
+        # what a busy appliance answers
+        (_status_response(400), False),
+        (_status_response(503), False),
+        (_json_response({"error": "400.03"}), False),
+        (_json_response({"error": {"code": 503.01}}), False),
+    ],
+)
+async def test_unsupported_command(vzug_api, response, unsupported):
+    with patch.object(vzug_api._client, "get", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = response
+        with pytest.raises(Exception) as exc_info:
+            await vzug_api.get_raw_programs(attempts=1)
+
+    assert is_unsupported(exc_info.value) is unsupported
+
+
+def test_no_answer_is_not_unsupported():
+    assert not is_unsupported(httpx.ConnectError(""))

@@ -373,7 +373,7 @@ class VZugApi:
                 # some appliances report unsupported commands and transient failures
                 # with a json error body and HTTP 200. Without this the body would
                 # satisfy the type check below and get stored as if it were valid.
-                raise ValueError(f"device returned an error response: {data['error']}")
+                raise ErrorResponse(data["error"])
 
             if expected_type is list and data is None:
                 # if we want a list and the response is null, we just treat that as an empty list
@@ -904,6 +904,25 @@ class VZugApi:
 
 
 class AuthenticationFailed(Exception): ...
+
+
+class ErrorResponse(ValueError):
+    """A json error body, ex. '{"error":{"code":404}}' or '{"error":"400.03"}'."""
+
+    def __init__(self, error: Any) -> None:
+        super().__init__(f"device returned an error response: {error}")
+        self.error = error
+
+
+def is_unsupported(exc: BaseException) -> bool:
+    """Whether the appliance doesn't know the command at all.
+
+    Unlike the '400.03' or '503' of a busy appliance, asking again won't change it.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code == httpx.codes.NOT_FOUND
+    error = exc.error if isinstance(exc, ErrorResponse) else None
+    return isinstance(error, dict) and error.get("code") == 404
 
 
 def _compact_json(value: Any) -> str:
