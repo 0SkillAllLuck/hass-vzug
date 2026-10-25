@@ -11,6 +11,7 @@ only read from it and write through 'api.VZugApi.set_zone_value' /
 
 import dataclasses
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -132,8 +133,15 @@ def program_key(name: str) -> str:
 
     Options are translation keys so Home Assistant can show each program with its
     own name and icon. A program we have no translation for shows its key.
+    Umlauts are written out as German does without them ('Tellerwärmen' ->
+    'tellerwaermen'), other accents are dropped ('Prélavage' -> 'prelavage').
     """
-    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    # NFD and not NFKD: it splits off accents only, so 'ℓ' or '½' keep the key
+    # they always had
+    name = unicodedata.normalize("NFD", name.lower().replace("ß", "ss"))
+    name = re.sub("([aou])̈", r"\1e", name)
+    name = "".join(c for c in name if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]+", "_", name).strip("_")
 
 
 def program_id_by_key(names: Mapping[int, str], key: str) -> int | None:

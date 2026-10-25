@@ -1,6 +1,8 @@
 """Zone handling for refrigerators, based on a CombiCooler V2000 (API 1.8.0)."""
 
 import json
+import pathlib
+import re
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -137,29 +139,68 @@ async def test_cmd_values_use_getcmd_and_setcmd():
         assert command.call_args.kwargs["params"] == {"value": "true"}
 
 
-def test_program_keys_have_translations_and_icons():
-    """Every program the AdoraDish V4000 reports must have a name and an icon."""
-    import pathlib
+# program names as the appliances report them, in the appliance's language,
+# with the select option each one gets
+PROGRAM_KEYS = {
+    # AdoraDish V4000 and V2000, set to English
+    "Eco": "eco",
+    "Automatic": "automatic",
+    "Quick": "quick",
+    "Intensive": "intensive",
+    "Glass": "glass",
+    "Fondue/Raclette": "fondue_raclette",
+    "Hygiene": "hygiene",
+    "Pre-rinsing": "pre_rinsing",
+    "Machine care": "machine_care",
+    # Adora dishwasher set to German, from its push notifications
+    "Automatik": "automatik",
+    "Party": "party",
+    # Combair V600, set to German
+    "Heissluft": "heissluft",
+    "Heissluft feucht": "heissluft_feucht",
+    "Heissluft Eco": "heissluft_eco",
+    "PizzaPlus": "pizzaplus",
+    "Grill-Umluft": "grill_umluft",
+    "Grill": "grill",
+    "Unterhitze": "unterhitze",
+    "Ober-/Unterhitze Eco": "ober_unterhitze_eco",
+    "Ober-/Unterhitze feucht": "ober_unterhitze_feucht",
+    "Ober-/Unterhitze": "ober_unterhitze",
+    "Tellerwärmen Garraum": "tellerwaermen_garraum",
+}
 
+
+@pytest.mark.parametrize(
+    ("name", "key"),
+    [
+        *PROGRAM_KEYS.items(),
+        # washing machine programs from the push notifications
+        ("30°C Ecoprogramm", "30_c_ecoprogramm"),
+        ("40°C Dampfglätten", "40_c_dampfglaetten"),
+        ("60°C Buntwäsche", "60_c_buntwaesche"),
+        ("ÄÖÜ Straße", "aeoeue_strasse"),
+        ("Tellerwärmen", "tellerwaermen"),
+        ("Prélavage", "prelavage"),
+        ("Crème brûlée", "creme_brulee"),
+        ("Noël", "noel"),
+        ("12 ℓ", "12"),
+    ],
+)
+def test_program_key(name, key):
+    assert zones.program_key(name) == key
+    if name.isascii():
+        # what program_key did before it knew umlauts and accents
+        assert key == re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def test_program_keys_have_translations_and_icons():
     base = pathlib.Path(zones.__file__).parent
     icons = json.loads((base / "icons.json").read_text())
     icon_states = icons["entity"]["select"]["program_select"]["state"]
-    names = [
-        "Eco",
-        "Automatic",
-        "Quick",
-        "Intensive",
-        "Glass",
-        "Fondue/Raclette",
-        "Hygiene",
-        "Pre-rinsing",
-    ]
     for lang in ("en", "de", "fr"):
         translations = json.loads((base / "translations" / f"{lang}.json").read_text())
         states = translations["entity"]["select"]["program_select"]["state"]
-        for name in names:
-            assert zones.program_key(name) in states, (lang, name)
-    for name in names:
-        assert zones.program_key(name) in icon_states, name
-    assert zones.program_key("Fondue/Raclette") == "fondue_raclette"
-    assert zones.program_key("Pre-rinsing") == "pre_rinsing"
+        assert set(PROGRAM_KEYS.values()) <= set(states), lang
+        assert set(icon_states) <= set(states), lang
+    # every program the AdoraDish V4000 reports has an icon
+    assert set(list(PROGRAM_KEYS.values())[:8]) <= set(icon_states)
