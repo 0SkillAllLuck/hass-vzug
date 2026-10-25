@@ -33,7 +33,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     except KeyError:
         credentials = None
-    shared = Shared(hass, base_url, credentials)
+    shared = Shared(hass, entry, base_url, credentials)
+    # also run after a failed setup, which HA retries with a new client every time.
+    # Not in 'async_unload_entry': a poll may still be running there, and closing the
+    # client under it fails the poll with an error in the log. HA cancels the entry's
+    # background tasks right after starting this, before they get to run again.
+    entry.async_on_unload(shared.async_shutdown)
     await shared.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
@@ -50,9 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        shared: Shared
-        if shared := hass.data[DOMAIN].pop(entry.entry_id):
-            await shared.async_shutdown()
+        hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
 
@@ -88,8 +91,11 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except KeyError:
             credentials = None
         base_url = URL(new_data[CONF_BASE_URL])
-        shared = Shared(hass, base_url, credentials)
-        await shared.async_config_entry_first_refresh()
+        shared = Shared(hass, entry, base_url, credentials)
+        try:
+            await shared.async_config_entry_first_refresh()
+        finally:
+            await shared.async_shutdown()
 
         old_prefix = shared.state_coord.data.device.get(
             "deviceUuid", ""

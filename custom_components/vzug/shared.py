@@ -3,6 +3,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 import yarl
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
@@ -70,6 +71,7 @@ UNREACHABLE_RETRY_INTERVAL = timedelta(minutes=1)
 
 class Shared:
     hass: HomeAssistant
+    entry: ConfigEntry
     client: api.VZugApi
 
     state_coord: StateCoordinator
@@ -85,10 +87,12 @@ class Shared:
     def __init__(
         self,
         hass: HomeAssistant,
+        entry: ConfigEntry,
         base_url: yarl.URL,
         credentials: api.Credentials | None,
     ) -> None:
         self.hass = hass
+        self.entry = entry
         self.client = api.VZugApi(
             base_url,
             credentials=credentials,
@@ -184,6 +188,7 @@ class Shared:
             await self.zone_coord.async_shutdown()
         if self.program_coord is not None:
             await self.program_coord.async_shutdown()
+        await self.client.aclose()
 
     async def _setup_zones(self) -> None:
         """Find out whether this appliance has zones.
@@ -346,9 +351,7 @@ class Shared:
                     state = await self.client.aggregate_state(
                         default_on_error=self._first_refresh_done
                     )
-                    self.hass.async_create_task(
-                        self.config_coord.async_request_refresh()
-                    )
+                    self._refresh_config_soon()
         except api.NO_ANSWER as exc:
             # some appliances switch off completely after a program. The coordinator
             # marks the entities unavailable and logs it once.
@@ -445,8 +448,16 @@ class Shared:
             # are updated when a program completes, and someone standing at the
             # appliance may have changed settings on its panel
             _LOGGER.debug("device activity changed to %s, refreshing config", active)
-            self.hass.async_create_task(self.config_coord.async_request_refresh())
+            self._refresh_config_soon()
         self._device_active = active
+
+    def _refresh_config_soon(self) -> None:
+        # tied to the entry, so an unload cancels it before the client is closed
+        self.entry.async_create_background_task(
+            self.hass,
+            self.config_coord.async_request_refresh(),
+            f"{DOMAIN} config refresh",
+        )
 
     async def _fetch_update(self) -> api.AggUpdateStatus:
         previous = self.update_coord.data

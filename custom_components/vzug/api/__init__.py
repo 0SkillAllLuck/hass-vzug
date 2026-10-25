@@ -292,6 +292,9 @@ class VZugApi:
         # set once we learn that this appliance really doesn't have any categories
         self._categories_may_be_empty = False
 
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
     async def _command(
         self,
         component: str,
