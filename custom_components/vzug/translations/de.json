@@ -75,6 +75,19 @@
         "name": "An Gerät senden"
       }
     },
+    "event": {
+      "program": {
+        "name": "Programm",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "program_started": "Programm gestartet",
+              "program_finished": "Programm beendet"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
       "energy_program": {
         "name": "Energie Programm"

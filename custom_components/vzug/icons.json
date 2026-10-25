@@ -5,6 +5,19 @@
                 "default": "mdi:send"
             }
         },
+        "event": {
+            "program": {
+                "default": "mdi:play-circle-outline",
+                "state_attributes": {
+                    "event_type": {
+                        "state": {
+                            "program_started": "mdi:play-circle-outline",
+                            "program_finished": "mdi:check-circle-outline"
+                        }
+                    }
+                }
+            }
+        },
         "number": {
             "timer": {
                 "default": "mdi:timer-outline"
