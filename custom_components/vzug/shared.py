@@ -100,10 +100,13 @@ class Shared:
             credentials=credentials,
         )
 
+        # 'always_update=False': the entities only show the data, so an unchanged
+        # answer has nothing to tell them
         self.state_coord = DataUpdateCoordinator(
             hass,
             _LOGGER,
             config_entry=entry,
+            always_update=False,
             name="state",
             update_interval=STATE_COORD_ACTIVE_INTERVAL,
             update_method=self._fetch_state,
@@ -112,6 +115,7 @@ class Shared:
             hass,
             _LOGGER,
             config_entry=entry,
+            always_update=False,
             name="update",
             update_interval=UPDATE_COORD_IDLE_INTERVAL,
             update_method=self._fetch_update,
@@ -120,6 +124,7 @@ class Shared:
             hass,
             _LOGGER,
             config_entry=entry,
+            always_update=False,
             name="config",
             update_interval=CONFIG_COORD_INTERVAL,
             update_method=self._fetch_config,
@@ -213,6 +218,7 @@ class Shared:
                 self.hass,
                 _LOGGER,
                 config_entry=self.entry,
+                always_update=False,
                 name="programs",
                 update_method=self._fetch_programs,
             )
@@ -222,6 +228,7 @@ class Shared:
             self.hass,
             _LOGGER,
             config_entry=self.entry,
+            always_update=False,
             name="zones",
             update_interval=ZONE_COORD_INTERVAL,
             update_method=self._fetch_zones,

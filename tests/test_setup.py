@@ -209,6 +209,41 @@ async def test_the_rest_arrives_after_the_setup(device, coordinators):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("device", [DISHWASHER, OVEN])
+async def test_unchanged_answers_leave_the_entities_alone(device):
+    """'always_update=False' relies on the data comparing by value."""
+    with Setup(device) as setup:
+        await setup.setup()
+        await setup.run_background()
+        shared = setup.shared
+
+        coordinators = [
+            coord
+            for coord in (
+                shared.state_coord,
+                shared.update_coord,
+                shared.config_coord,
+                shared.zone_coord,
+                shared.program_coord,
+            )
+            if coord is not None
+        ]
+        assert len(coordinators) == 4
+        for coord in coordinators:
+            assert coord.config_entry is setup.entry
+            calls = []
+            unsub = coord.async_add_listener(lambda: calls.append(1))
+            # a fresh object every time, but the same answers
+            before = coord.data
+            await coord.async_refresh()
+            unsub()
+
+            assert coord.last_update_success
+            assert coord.data is not before
+            assert calls == [], coord.name
+
+
+@pytest.mark.asyncio
 async def test_failing_background_refresh_is_retried():
     """A busy appliance must not fail the setup, nor keep its settings away."""
     with Setup(DISHWASHER) as setup:
